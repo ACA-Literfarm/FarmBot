@@ -24,13 +24,15 @@ async def cmd_help(message: Message):
         "🤖 Available commands:\n"
         "/start - Welcome message\n"
         "/help - Show this help message\n"
-        "/save &lt;text&gt; - Save transaction"
+        "No command - Send message to deepseek for interpretation"
     )
     await message.answer(help_text)
 
-@dp.message(Command("save"))
-async def cmd_save(message: Message):
-    await message.answer("💾 Save command received! (Deepseek functionality coming soon.)")
+
+@dp.message()
+async def handle_no_command(message: Message):
+    await message.answer("Message without command, sending to deepseek...")
+
 
 async def main() -> None:
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
