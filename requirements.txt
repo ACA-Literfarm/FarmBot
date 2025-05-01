@@ -1,5 +1,4 @@
 openai
 aiogram
-dotenv
+python-dotenv
 pytest
-nano dependencies.txt
