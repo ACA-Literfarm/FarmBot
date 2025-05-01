@@ -1,3 +1,5 @@
 openai
 aiogram
 dotenv
+pytest
+nano dependencies.txt
