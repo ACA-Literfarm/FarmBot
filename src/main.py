@@ -5,14 +5,12 @@ import sys
 import json
 from prompts import FINANCIAL_CLASSIFIER_PROMPT
 from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher, html
+from aiogram import Bot, Dispatcher 
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import Command 
 from aiogram.types import Message
 from openai import AsyncOpenAI
-from typing import cast
-from openai.types.chat import ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam
 
 load_dotenv()
 
@@ -68,16 +66,15 @@ async def query_ai_model(user_message: str) -> str:
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
-    await message.answer("👋 Welcome to LiteFarmBot! Use /help to see available commands.")
+    await message.answer("👋 ¡Bienvenido a LiteFarmBot! Usa /help para ver los comandos disponibles.")
 
 
 @dp.message(Command("help"))
 async def cmd_help(message: Message):
     help_text = (
-        "🤖 Available commands:\n"
-        "/start - Welcome message\n"
-        "/help - Show this help message\n"
-        "Save transaction - ..."  #Show instructions for saving transaction
+        "🤖 Comandos disponibles:\n"
+        "/start - Mensaje de bienvenida\n"
+        "/help - Mostrar este mensaje de ayuda\n"
     )
     await message.answer(help_text)
 
@@ -87,6 +84,10 @@ async def handle_regular_message(message: Message):
         return
 
     user_input = message.text.strip()
+    if not user_input:
+        await message.answer("⚠️ El mensaje está vacío. Por favor, escribe algo para que pueda ayudarte.")
+        return
+
     response_text = await query_ai_model(user_input)
 
     try:
@@ -96,7 +97,7 @@ async def handle_regular_message(message: Message):
         respuesta = data.get("respuesta")
 
         if not clasificacion or not respuesta:
-            raise ValueError("Missing expected keys in AI response.")
+            raise ValueError("Faltan claves esperadas en la respuesta de la IA.")
         
         if clasificacion == "no_relacionado":
             respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles."
@@ -104,8 +105,11 @@ async def handle_regular_message(message: Message):
         await message.answer(respuesta)
 
     except json.JSONDecodeError:
-        logging.warning("Respuesta del modelo no tiene formato JSON válido.")
-        await message.answer("❌ Lo siento, no entendí tu mensaje. ¿Podrías reformularlo?")
+        logging.warning("Respuesta del modelo no tiene formato JSON válido. Respuesta recibida: %s", response_text)
+        await message.answer(
+            "❌ Lo siento, no entendí tu mensaje o hubo un error procesando la respuesta. "
+            "Por favor, intenta reformular tu mensaje o usa /help para ver ejemplos de uso."
+        )
 
 
 async def main() -> None:
