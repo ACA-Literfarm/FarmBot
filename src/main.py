@@ -63,6 +63,14 @@ async def query_ai_model(user_message: str) -> str:
         logging.error(f"Error AI: {e}")
         return "⚠️ There was an error processing your message. Try again later."
 
+# --- LiteFarmAPI consulting function ---
+async def handle_api_transaction(api_response: json):
+    
+    note = api_response.get("note")
+    value = api_response.get("value")
+    type_ = api_response.get("type")
+
+    logging.info(f"API Transaction: Note: {note}, Value: {value}, Type: {type_}")
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
@@ -95,13 +103,17 @@ async def handle_regular_message(message: Message):
 
         clasificacion = data.get("clasificacion")
         respuesta = data.get("respuesta")
+        api_response = data.get("respuesta_api", {"note": "", "value": "", "type": ""})
 
         if not clasificacion or not respuesta:
-            raise ValueError("Faltan claves esperadas en la respuesta de la IA.")
+            raise ValueError("Faltan claves esperadas en la respuesta de la IA.") #Change to a generic response
         
         if clasificacion == "no_relacionado":
             respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles."
 
+        # Handle the API response before sending to LiteFarmAPI
+        await handle_api_transaction(api_response)
+        # Message can be generated manually w no AI
         await message.answer(respuesta)
 
     except json.JSONDecodeError:
