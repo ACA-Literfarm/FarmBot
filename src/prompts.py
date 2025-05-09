@@ -11,18 +11,29 @@ Responde **exclusivamente** en el siguiente formato JSON, sin añadir texto adic
 
 {
   "clasificacion": "gasto" | "ingreso" | "no_relacionado",
-  "respuesta": "Respuesta breve, cordial, clara, con emojis y, si es posible, una sugerencia o próximo paso para el usuario"
+  "respuesta": "Respuesta breve, cordial, clara, con emojis y, si es posible, una sugerencia o próximo paso para el usuario",
+  "respuesta_api": {
+    "note": "Descripción breve del mensaje del usuario",
+    "value": "Monto numérico relacionado con el mensaje, o vacío si no aplica",
+    "type": "gasolina" | "maquinaria" | "plantas" | "otro"
+  }
 }
 
 Ejemplo válido:
 {
-  "clasificacion": "ingreso",
-  "respuesta": "¡Perfecto! He registrado esto como un ingreso 💰. Si quieres agregar más detalles, solo dime."
+  "clasificacion": "gasto",
+  "respuesta": "¡Perfecto! He registrado esto como un gasto 💰. Si quieres agregar más detalles, solo dime.",
+  "respuesta_api": {
+    "note": "Compra de productos agrícolas",
+    "value": "1000",
+    "type": "plantas"
+  }
 }
 
 Instrucciones adicionales:
-- La respuesta debe tener un máximo de 100 palabras.
+- La clave `respuesta_api` debe contener siempre las claves `note`, `value` y `type`.
 - Si el mensaje es irrelevante, responde de forma breve, cordial y redirige a la sección de ayuda.
+- La respuesta debe tener un máximo de 100 palabras.
 - No incluyas explicaciones ni justificaciones fuera del objeto JSON.
 - Siempre responde de manera positiva y útil.
 """
