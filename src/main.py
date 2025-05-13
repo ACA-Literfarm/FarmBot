@@ -82,7 +82,10 @@ async def cmd_help(message: Message):
     help_text = (
         "🤖 Comandos disponibles:\n"
         "/start - Mensaje de bienvenida\n"
-        "/help - Mostrar este mensaje de ayuda\n"
+        "/help - Mostrar este mensaje de ayuda\n\n"
+        "📋 Ejemplos de uso:\n"
+        "• Para registrar compras: 'Hoy gasté 50 dólares en un 20 bolsas de fertilizante'\n"
+        "• Para registrar ingresos: 'Hoy vendí 30 dólares de un paquete de 120 manzanas'\n"
     )
     await message.answer(help_text)
 
@@ -127,6 +130,11 @@ async def handle_regular_message(message: Message):
         respuesta = data.get("respuesta")
         api_response = data.get("respuesta_api", {"note": "", "value": "", "type": ""})
 
+        if clasificacion == "no_relacionado":
+            respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles y ejemplos de uso."
+            await message.answer(respuesta)
+            return  # Salir sin completar datos
+
         # Verificar si faltan campos en la respuesta de la IA
         missing_fields = []
         if not api_response.get("note"):
@@ -148,9 +156,6 @@ async def handle_regular_message(message: Message):
                 f"Por favor, proporciona el valor para '{missing_fields[0]}':"
             )
             return
-
-        if clasificacion == "no_relacionado":
-            respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles."
 
         # Manejar la respuesta de la API
         await handle_api_transaction(api_response)
