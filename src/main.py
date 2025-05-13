@@ -86,12 +86,34 @@ async def cmd_help(message: Message):
     )
     await message.answer(help_text)
 
+# Diccionario para rastrear el estado del usuario
+user_states = {}
+
 @dp.message()
 async def handle_regular_message(message: Message):
-    if message.text.startswith('/'):
-        return
-
+    user_id = message.from_user.id  # Identificar al usuario por su ID
     user_input = message.text.strip()
+
+    # Verificar si el usuario está completando un campo faltante
+    if user_id in user_states:
+        state = user_states[user_id]
+        missing_field = state["missing_fields"].pop(0)  # Obtener el siguiente campo faltante
+        state["api_response"][missing_field] = user_input  # Guardar el valor proporcionado
+
+        # Si aún faltan campos, solicitar el siguiente
+        if state["missing_fields"]:
+            next_field = state["missing_fields"][0]
+            await message.answer(f"Por favor, proporciona el valor para '{next_field}':")
+            return
+        else:
+            # Todos los campos están completos
+            api_response = state["api_response"]
+            del user_states[user_id]  # Limpiar el estado del usuario
+            await handle_api_transaction(api_response)
+            await message.answer(state["respuesta"])  # Responder con el mensaje original de la IA
+            return
+
+    # Si no hay estado previo, procesar el mensaje normalmente
     if not user_input:
         await message.answer("⚠️ El mensaje está vacío. Por favor, escribe algo para que pueda ayudarte.")
         return
@@ -105,15 +127,33 @@ async def handle_regular_message(message: Message):
         respuesta = data.get("respuesta")
         api_response = data.get("respuesta_api", {"note": "", "value": "", "type": ""})
 
-        if not clasificacion or not respuesta:
-            raise ValueError("Faltan claves esperadas en la respuesta de la IA.") #Change to a generic response
-        
+        # Verificar si faltan campos en la respuesta de la IA
+        missing_fields = []
+        if not api_response.get("note"):
+            missing_fields.append("note")
+        if not api_response.get("value"):
+            missing_fields.append("value")
+        if not api_response.get("type"):
+            missing_fields.append("type")
+
+        if missing_fields:
+            # Guardar el estado del usuario
+            user_states[user_id] = {
+                "missing_fields": missing_fields,
+                "api_response": api_response,
+                "respuesta": respuesta,
+            }
+            await message.answer(
+                f"⚠️ Faltaron datos para completar la transacción.\n"
+                f"Por favor, proporciona el valor para '{missing_fields[0]}':"
+            )
+            return
+
         if clasificacion == "no_relacionado":
             respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles."
 
-        # Handle the API response before sending to LiteFarmAPI
+        # Manejar la respuesta de la API
         await handle_api_transaction(api_response)
-        # Message can be generated manually w no AI
         await message.answer(respuesta)
 
     except json.JSONDecodeError:
