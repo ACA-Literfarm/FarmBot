@@ -82,16 +82,46 @@ async def cmd_help(message: Message):
     help_text = (
         "🤖 Comandos disponibles:\n"
         "/start - Mensaje de bienvenida\n"
-        "/help - Mostrar este mensaje de ayuda\n"
+        "/help - Mostrar este mensaje de ayuda\n\n"
+        "📋 Ejemplos de uso:\n"
+        "• Para registrar compras: 'Hoy gasté 50 dólares en un 20 bolsas de fertilizante'\n"
+        "• Para registrar ingresos: 'Hoy vendí 30 dólares de un paquete de 120 manzanas'\n"
     )
     await message.answer(help_text)
 
+# Diccionario para rastrear el estado del usuario
+user_states = {}
+
 @dp.message()
 async def handle_regular_message(message: Message):
-    if message.text.startswith('/'):
-        return
-
+    user_id = message.from_user.id  # Identificar al usuario por su ID
     user_input = message.text.strip()
+
+    # Verificar si el usuario está completando un campo faltante
+    if user_id in user_states:
+        state = user_states[user_id]
+        missing_field = state["missing_fields"].pop(0)  # Obtener el siguiente campo faltante
+        state["api_response"][missing_field] = user_input  # Guardar el valor proporcionado
+
+        # Si aún faltan campos, solicitar el siguiente
+        if state["missing_fields"]:
+            next_field = state["missing_fields"][0]
+            if next_field == "value":
+                await message.answer("💰 Por favor, ingresa el precio de la transacción:")
+            elif next_field == "note":
+                await message.answer("📝 Por favor, proporciona una breve descripción de la transacción:")
+            elif next_field == "type":
+                await message.answer("📂 Por favor, indica el tipo de transacción (por ejemplo: gasolina, maquinaria, plantas, otro):")
+            return
+        else:
+            # Todos los campos están completos
+            api_response = state["api_response"]
+            del user_states[user_id]  # Limpiar el estado del usuario
+            await handle_api_transaction(api_response)
+            await message.answer(state["respuesta"])  # Responder con el mensaje original de la IA
+            return
+
+    # Si no hay estado previo, procesar el mensaje normalmente
     if not user_input:
         await message.answer("⚠️ El mensaje está vacío. Por favor, escribe algo para que pueda ayudarte.")
         return
@@ -105,15 +135,38 @@ async def handle_regular_message(message: Message):
         respuesta = data.get("respuesta")
         api_response = data.get("respuesta_api", {"note": "", "value": "", "type": ""})
 
-        if not clasificacion or not respuesta:
-            raise ValueError("Faltan claves esperadas en la respuesta de la IA.") #Change to a generic response
-        
         if clasificacion == "no_relacionado":
-            respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles."
+            respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles y ejemplos de uso."
+            await message.answer(respuesta)
+            return  # Salir sin completar datos
 
-        # Handle the API response before sending to LiteFarmAPI
+        # Verificar si faltan campos en la respuesta de la IA
+        missing_fields = []
+        if not api_response.get("note"):
+            missing_fields.append("note")
+        if not api_response.get("value"):
+            missing_fields.append("value")
+        if not api_response.get("type"):
+            missing_fields.append("type")
+
+        if missing_fields:
+            # Guardar el estado del usuario
+            user_states[user_id] = {
+                "missing_fields": missing_fields,
+                "api_response": api_response,
+                "respuesta": respuesta,
+            }
+            first_missing_field = missing_fields[0]
+            if first_missing_field == "value":
+                await message.answer("💰 Faltó el precio de la transacción. Por favor, ingrésalo:")
+            elif first_missing_field == "note":
+                await message.answer("📝 Faltó la descripción de la transacción. Por favor, proporciónala:")
+            elif first_missing_field == "type":
+                await message.answer("📂 Faltó el tipo de transacción. Por favor, indícalo (por ejemplo: gasolina, maquinaria, plantas, otro):")
+            return
+
+        # Manejar la respuesta de la API
         await handle_api_transaction(api_response)
-        # Message can be generated manually w no AI
         await message.answer(respuesta)
 
     except json.JSONDecodeError:

@@ -22,7 +22,7 @@ Responde **exclusivamente** en el siguiente formato JSON, sin añadir texto adic
 Ejemplo válido:
 {
   "clasificacion": "gasto",
-  "respuesta": "¡Perfecto! He registrado esto como un gasto 💰. Si quieres agregar más detalles, solo dime.",
+  "respuesta": "¡Perfecto! He registrado esto como un gasto 💰. Si quieres registrar otra transacción, solo dime.",
   "respuesta_api": {
     "note": "Compra de productos agrícolas",
     "value": "1000",
