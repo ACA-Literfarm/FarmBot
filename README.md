@@ -26,7 +26,7 @@ python3 -m venv env
 ### 3. Install Dependencies
 
 ```sh
-pip install -r dependencies.txt
+pip install -r [requirements.txt](http://_vscodecontentref_/20)
 ```
 
 ### 4. Set the Telegram API Key
@@ -44,3 +44,13 @@ Replace `your_telegram_bot_token_here` with your actual Telegram bot token.
 ```sh
 python3 src/main.py
 ```
+
+### 6. Test the Bot
+
+Test each of the following scenarios in Telegram:
+- Send the `/start` command
+- Send the `/help` command 
+- Send a regular message like "Gasté 50 dólares en fertilizante"
+- Test the missing field handling
+
+If you encounter any new errors, please share the error messages so I can help you resolve them!
