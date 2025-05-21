@@ -16,6 +16,7 @@ load_dotenv()
 
 # Set your bot and AI token here or use an environment variable
 BOT_TOKEN = os.getenv("TELEGRAM_API_KEY")
+LINK_SERVER = os.getenv("LINK_SERVER")
 
 if not BOT_TOKEN:
     raise ValueError("Please set the TELEGRAM_API_KEY environment variable.")
@@ -91,6 +92,16 @@ async def cmd_help(message: Message):
 
 # Diccionario para rastrear el estado del usuario
 user_states = {}
+
+@dp.message(Command("login"))
+async def cmd_login(message: Message):
+    text = (
+        ## El siguiente texto muestra el mensaje con 'aqui' como un enlace.
+        f"🔑 Para iniciar sesión, por favor haga click [aqui]({LINK_SERVER}/login)"
+        ## El siguiente texto sirve como respaldo en caso de que el enlace no funcione automaticamente.
+        f"\n Si el metodo anterior no funciona, copie y pegue el siguiente enlace en su navegador: {LINK_SERVER}/login"
+    )
+    await message.answer(text, parse_mode="Markdown")
 
 @dp.message()
 async def handle_regular_message(message: Message):
