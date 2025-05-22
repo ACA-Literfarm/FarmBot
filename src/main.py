@@ -5,8 +5,8 @@ from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-from bot.commands import cmd_start, cmd_help
-from bot.handlers import cmd_login, handle_login_flow, handle_regular_message, cmd_revenue_types, cmd_crop_varieties
+import bot.commands as commands
+import bot.handlers as handlers
 from config import BOT_TOKEN
 from fastapi import FastAPI
 from routes.auth import router as auth_router  # Import the auth router
@@ -18,12 +18,12 @@ dp = Dispatcher()
 #app.include_router(auth_router)  # Add a prefix for API routes
 
 # Register Telegram bot handlers
-dp.message.register(cmd_start, Command("start"))
-dp.message.register(cmd_help, Command("help"))
-dp.message.register(cmd_login, Command("login"))
-dp.message.register(cmd_revenue_types, Command("revenue_types"))
-dp.message.register(cmd_crop_varieties, Command("crop_varieties"))  # Register the new command
-dp.message.register(handle_regular_message)
+dp.message.register(commands.cmd_start, Command("start"))
+dp.message.register(commands.cmd_help, Command("help"))
+dp.message.register(commands.cmd_login, Command("login"))
+dp.message.register(commands.cmd_revenue_types, Command("revenue_types"))
+dp.message.register(commands.cmd_crop_varieties, Command("crop_varieties"))  # Register the new command
+dp.message.register(handlers.handle_regular_message)
 # dp.message.register(handle_login_flow, state="*")  # Register the login flow handler
 
 async def main() -> None:

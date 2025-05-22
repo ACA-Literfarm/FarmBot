@@ -11,7 +11,7 @@ async def handle_api_transaction(api_response: dict):
     type_ = api_response.get("type")
 
     # Simulate saving to a database or external API
-    logging.info(f"API Transaction: Note: {note}, Value: {value}, Type: {type_}")
+    logging.info(f"API TRANSACTION: Note: {note}, Value: {value}, Type: {type_}")
     # Add actual API call logic here
 
 async def get_revenue_types(farm_id: str, token: str) -> dict:
@@ -38,7 +38,6 @@ async def get_revenue_types(farm_id: str, token: str) -> dict:
         # Check if the request was successful
         if response.status_code == 200:
             data = response.json()
-            logging.info(f"Revenue types fetched successfully for farm {farm_id}.")
             return {"success": True, "data": data}
         else:
             logging.error(f"Failed to fetch revenue types: {response.text}")

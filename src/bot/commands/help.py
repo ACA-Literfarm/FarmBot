@@ -1,9 +1,4 @@
-from aiogram.filters import Command
 from aiogram.types import Message
-from bot.handlers import cmd_login, handle_login_flow
-
-async def cmd_start(message: Message):
-    await message.answer("👋 ¡Bienvenido a LiteFarmBot! Usa /help para ver los comandos disponibles.")
 
 async def cmd_help(message: Message):
     help_text = (
