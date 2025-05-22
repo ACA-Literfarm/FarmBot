@@ -3,7 +3,7 @@ import logging
 from aiogram.types import Message
 from bot.state import user_states
 from services.ai import query_ai_model
-from services.api import handle_api_transaction
+from services.api import handle_api_transaction, get_revenue_types
 from services.login import login_user
 
 async def handle_regular_message(message: Message):
@@ -150,3 +150,32 @@ async def handle_login_flow(message: Message):
         # Clear the user's state
         del user_states[user_id]
         return
+
+async def cmd_revenue_types(message: Message):
+    """
+    Handles the /revenue_types command to list available revenue types for the user's farm.
+    """
+    if message.from_user is None:
+        await message.answer("⚠️ No se pudo identificar al usuario. Por favor, intenta nuevamente.")
+        return
+
+    user_id = message.from_user.id
+
+    # Burned values for now (replace with dynamic values later)
+    farm_id = "5aa78ca8-3236-11f0-a33e-66ab45519382"  # Replace with dynamic farm_id
+    token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNzcxMDE1YWMtMzIyZS0xMWYwLTk0YjQtNjZhYjQ1NTE5MzgyIiwiaWF0IjoxNzQ3OTA2MjQ1LCJleHAiOjE3NDg1MTEwNDV9.lUfU8lnpXUB5E21dfo8W5swk0zQ0jC5ju9JYJjRMNY0"  # Replace with dynamic token
+
+    # Fetch the revenue types
+    result = await get_revenue_types(farm_id, token)
+
+    if result["success"]:
+        revenue_types = result["data"]
+        if revenue_types:
+            response_text = "📋 Tipos de ingresos disponibles:\n"
+            for revenue_type in revenue_types:
+                response_text += f"• {revenue_type['revenue_name']}\n"
+            await message.answer(response_text)
+        else:
+            await message.answer("ℹ️ No se encontraron tipos de ingresos disponibles.")
+    else:
+        await message.answer(f"❌ Error al obtener los tipos de ingresos: {result['error']}")

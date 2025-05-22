@@ -46,7 +46,7 @@ async def login_user(email: str, password: str) -> dict:
             farms = data.get("farms", [])
 
             user_id = user.get("user_id")
-            farm_id = farms[0].get("farm_id") if farms else 0  # Default to 0 if no farm_id is found
+            farm_id = str(farms[0].get("farm_id")) if farms and farms[0].get("farm_id") else "0"  # Default to "0" if no farm_id is found
 
             if not all([token, user_id, farm_id]):
                 raise ValueError("Missing required fields in the login response.")
