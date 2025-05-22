@@ -191,6 +191,11 @@ body {
     background-color: #F0C030; /* Un tono ligeramente más oscuro al hacer clic */
 }
 
+a {
+    text-decoration: none; /* Quita el subrayado */
+    color: inherit; /* Usa el color del texto del elemento padre */
+}
+
 /* Responsive adjustments */
 @media (max-width: 480px) {
   .container {

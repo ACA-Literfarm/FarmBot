@@ -20,7 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Iniciando sesión con Google...")
     // Aquí iría la lógica de autenticación con Google usando el mismo API Token que LiteFarm
     // Por ahora, simulamos un inicio de sesión exitoso
-    simulateLogin(true)
+    //simulateLogin(true)
   })
 
   // Manejar el envío del formulario de correo electrónico y contraseña
