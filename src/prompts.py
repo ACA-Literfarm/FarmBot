@@ -15,7 +15,7 @@ Responde **exclusivamente** en el siguiente formato JSON, sin añadir texto adic
   "respuesta_api": {
     "note": "Descripción breve del mensaje del usuario",
     "value": "Monto numérico relacionado con el mensaje, o vacío si no aplica",
-    "type": "gasolina" | "maquinaria" | "plantas" | "otro"
+    "type": "ID o nombre del tipo de gasto seleccionado de la lista proporcionada en 'Expense types'"
   }
 }
 
@@ -36,4 +36,6 @@ Instrucciones adicionales:
 - La respuesta debe tener un máximo de 100 palabras.
 - No incluyas explicaciones ni justificaciones fuera del objeto JSON.
 - Siempre responde de manera positiva y útil.
+- Para gastos, selecciona el tipo de gasto (type) más apropiado de la lista proporcionada en 'Expense types'.
+- Si es posible, usa el ID del tipo de gasto para el campo 'type' en lugar del nombre.
 """

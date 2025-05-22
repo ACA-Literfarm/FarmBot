@@ -11,11 +11,14 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command 
 from aiogram.types import Message
 from openai import AsyncOpenAI
+import requests
 
 load_dotenv()
 
 # Set your bot and AI token here or use an environment variable
 BOT_TOKEN = os.getenv("TELEGRAM_API_KEY")
+
+URL_LITEFARM = os.getenv("URL_LITEFARM")
 
 if not BOT_TOKEN:
     raise ValueError("Please set the TELEGRAM_API_KEY environment variable.")
@@ -42,18 +45,31 @@ client = AsyncOpenAI(
 dp = Dispatcher()
 
 # --- Deepseek consulting function ---
-async def query_ai_model(user_message: str) -> str:
+async def query_ai_model(user_message: str, expense_type: list) -> str:
     try:
-
+        # Format expense types to be more readable for the AI
+        formatted_expense_types = []
+        if expense_type:
+            for item in expense_type:
+                if isinstance(item, dict):
+                    expense_id = item.get('expense_type_id', '')
+                    name = item.get('expense_name', '')
+                    if expense_id and name:
+                        formatted_expense_types.append(f"{expense_id}: {name}")
+            
+        expense_context = "Expense types available:\n" + "\n".join(formatted_expense_types) if formatted_expense_types else "No expense types available"
+        
         messages = [
             {"role": "system", "content": FINANCIAL_CLASSIFIER_PROMPT},
+            {"role": "system", "content": expense_context},
+            {"role": "system", "content": "When user reports an expense, select the most appropriate expense type ID from the list above."},
             {"role": "user", "content": user_message},
         ]
 
         response = await client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
-            max_tokens=100,
+            max_tokens=150,
             temperature=0.3,
         )
 
@@ -71,6 +87,18 @@ async def handle_api_transaction(api_response: json):
     type_ = api_response.get("type")
 
     logging.info(f"API Transaction: Note: {note}, Value: {value}, Type: {type_}")
+
+async def request_expense_types():
+    try:
+        response = requests.get(f"{URL_LITEFARM}/expense_type/all")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logging.error(f"Error fetching expense types: {response.status_code}")
+            return []
+    except requests.RequestException as e:
+        logging.error(f"Request error: {e}")
+        return []
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
@@ -126,7 +154,9 @@ async def handle_regular_message(message: Message):
         await message.answer("⚠️ El mensaje está vacío. Por favor, escribe algo para que pueda ayudarte.")
         return
 
-    response_text = await query_ai_model(user_input)
+    expense_type = await request_expense_types()
+
+    response_text = await query_ai_model(user_input, expense_type)
 
     try:
         data = json.loads(response_text)
@@ -135,6 +165,36 @@ async def handle_regular_message(message: Message):
         respuesta = data.get("respuesta")
         api_response = data.get("respuesta_api", {"note": "", "value": "", "type": ""})
 
+        # When an expense is detected, show available expense types
+        if clasificacion == "gasto":
+            # Format expense types for user display
+            expense_options = []
+            if expense_type:
+                for item in expense_type:
+                    if isinstance(item, dict):
+                        expense_id = item.get('expense_type_id', '')
+                        name = item.get('expense_name', '')
+                        if expense_id and name:
+                            expense_options.append(f"• {name} (ID: {expense_id})")
+            
+            # If there are expense types available, suggest a selected one
+            if expense_options and api_response.get("type"):
+                selected_type = api_response.get("type")
+                selected_name = ""
+                
+                # Find the name of the selected expense type
+                for item in expense_type:
+                    if isinstance(item, dict) and str(item.get('expense_type_id', '')) == str(selected_type):
+                        selected_name = item.get('expense_name', '')
+                        break
+                
+                if not selected_name and selected_type:
+                    # If we couldn't find the ID in the list, maybe the AI sent the name directly
+                    selected_name = selected_type
+                
+                expense_list = "\n".join(expense_options)
+                respuesta = f"De los siguientes tipos de gastos:\n\n{expense_list}\n\nSeleccioné este tipo: {selected_name}\n\n{respuesta}"
+        
         if clasificacion == "no_relacionado":
             respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles y ejemplos de uso."
             await message.answer(respuesta)
