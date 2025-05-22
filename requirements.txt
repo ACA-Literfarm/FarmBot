@@ -1,3 +1,5 @@
 openai
 aiogram
 python-dotenv
+fastapi
+uvicorn
