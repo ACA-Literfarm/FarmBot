@@ -92,13 +92,17 @@ async def request_expense_types():
     try:
         response = requests.get(f"{URL_LITEFARM}/expense_type/all")
         if response.status_code == 200:
-            return response.json()
+            data = response.json()
+            if not data:  # Check if response is empty
+                logging.error("Expense types response is empty")
+                return None
+            return data
         else:
             logging.error(f"Error fetching expense types: {response.status_code}")
-            return []
+            return None
     except requests.RequestException as e:
         logging.error(f"Request error: {e}")
-        return []
+        return None
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
@@ -155,6 +159,11 @@ async def handle_regular_message(message: Message):
         return
 
     expense_type = await request_expense_types()
+    
+    # Check if there was an error getting expense types
+    if expense_type is None:
+        await message.answer("Hubo un error en el servidor obteninendo tipos de gastos, intentalo mas tarde.")
+        return
 
     response_text = await query_ai_model(user_input, expense_type)
 
@@ -175,7 +184,7 @@ async def handle_regular_message(message: Message):
                         expense_id = item.get('expense_type_id', '')
                         name = item.get('expense_name', '')
                         if expense_id and name:
-                            expense_options.append(f"• {name} (ID: {expense_id})")
+                            expense_options.append(f"• {name}")
             
             # If there are expense types available, suggest a selected one
             if expense_options and api_response.get("type"):
