@@ -10,6 +10,7 @@ import bot.handlers as handlers
 from config import BOT_TOKEN
 from fastapi import FastAPI
 from routes.auth import router as auth_router  # Import the auth router
+from bot.commands.cache import cmd_cache_info, cmd_clear_cache  # Import cache commands
 
 dp = Dispatcher()
 #app = FastAPI()
@@ -23,6 +24,9 @@ dp.message.register(commands.cmd_help, Command("help"))
 dp.message.register(commands.cmd_login, Command("login"))
 dp.message.register(commands.cmd_revenue_types, Command("revenue_types"))
 dp.message.register(commands.cmd_crop_varieties, Command("crop_varieties"))  # Register the new command
+dp.message.register(commands.cmd_cache_info, Command("cache_info"))
+dp.message.register(commands.cmd_clear_cache, Command("clear_cache"))
+
 dp.message.register(handlers.handle_regular_message)
 # dp.message.register(handle_login_flow, state="*")  # Register the login flow handler
 

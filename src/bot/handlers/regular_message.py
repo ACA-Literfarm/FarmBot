@@ -4,7 +4,8 @@ from aiogram.types import Message
 from bot.state import user_states
 from services.ai import query_ai_model
 from services.api import handle_api_transaction, get_revenue_types
-from config import LOGIN_TOKEN
+from cache import crop_cache
+from config import LOGIN_TOKEN, FARM_ID
 
 async def handle_regular_message(message: Message):
     if message.from_user is None:
@@ -14,8 +15,8 @@ async def handle_regular_message(message: Message):
     user_id = message.from_user.id
 
     # Burned values for now (replace with dynamic values later)
-    farm_id = "5aa78ca8-3236-11f0-a33e-66ab45519382"  # Replace with dynamic farm_id
-    token = LOGIN_TOKEN  # Replace with dynamic token
+    farm_id = str(FARM_ID)  # Replace with dynamic farm_id
+    token = str(LOGIN_TOKEN)  # Replace with dynamic token
 
     user_input = message.text.strip() if message.text else ""
 
@@ -23,10 +24,31 @@ async def handle_regular_message(message: Message):
         await message.answer("⚠️ El mensaje está vacío. Por favor, escribe algo para que pueda ayudarte.")
         return
 
-    # Step 1: Query the AI model without revenue types
-    response_text = await query_ai_model(user_input, include_revenue_types=False)
-
+    response_text = ""  # Initialize response_text to avoid unbound variable error
     try:
+        # Step 1: Get crop varieties from cache (optimized)
+        crop_varieties_result = await crop_cache.get_crop_varieties(farm_id, token)
+        if not crop_varieties_result["success"]:
+            await message.answer("⚠️ Error al obtener las variedades de cultivos. Por favor, intenta nuevamente más tarde.")
+            return
+
+        crop_varieties = [item["crop_variety_name"] for item in crop_varieties_result["data"]]
+
+        # Generate a generic crop varieties list for the AI model if list is empty
+        if not crop_varieties or len(crop_varieties) == 0:
+            logging.warning("No se encontraron variedades de cultivos. Usando lista genérica.")
+            crop_varieties = ["maíz", "trigo", "soja", "arroz", "cebada", "sorgo", "mijo", "avena"]
+
+        # Log cache usage
+        from_cache = crop_varieties_result.get("from_cache", False)
+        cache_status = "caché" if from_cache else "API"
+
+        # Query the AI model with crop varieties included
+        response_text = await query_ai_model(
+            user_message=user_input,
+            crop_varieties=crop_varieties,
+        )
+
         data = json.loads(response_text)
 
         clasificacion = data.get("clasificacion")
@@ -38,30 +60,67 @@ async def handle_regular_message(message: Message):
             await message.answer(respuesta)
             return  # Exit without further processing
 
-        # Step 2: If classified as "ingreso", fetch revenue types and re-query the AI model
+        # Step 2: If classified as "ingreso," fetch revenue types and re-query the AI model
         if clasificacion == "ingreso":
-
-            # Fetch revenue types
+            
+            # Initialize revenue_types to avoid unbound variable error
+            revenue_types = []
+            
+            # Fetch revenue types (consider adding cache for this too)
             revenue_types_result = await get_revenue_types(farm_id, token)
- 
+
             if not revenue_types_result["success"]:
                 await message.answer("⚠️ Error al obtener los tipos de ingresos. Por favor, intenta nuevamente más tarde.")
                 return
 
-            revenue_types = [item["revenue_name"] for item in revenue_types_result["data"]]
+            revenue_types = [item["revenue_name"].lower() for item in revenue_types_result["data"]]
 
             # Re-query the AI model with revenue types included
             response_text = await query_ai_model(
                 user_message=user_input,
-                farm_id=farm_id,
-                token=token,
-                include_revenue_types=True,
                 revenue_types=revenue_types,
+                crop_varieties=crop_varieties
             )
 
             data = json.loads(response_text)
             respuesta = data.get("respuesta")
             api_response = data.get("respuesta_api", {"note": "", "value": "", "type": ""})
+
+            # Step 3: Validate crop variety if the transaction involves crops
+            if api_response.get("type") and api_response["type"] in revenue_types:
+                # Check if the identified crop variety is in the list
+                identified_crop = api_response["note"]
+                crop_varieties_lower = [crop.lower() for crop in crop_varieties]
+                
+                # Extract potential crop names from the identified_crop string
+                identified_crop_words = identified_crop.lower().split()
+                crop_found = False
+                
+                # Check if any crop variety matches or is contained in the identified_crop
+                for crop in crop_varieties_lower:
+                    crop_words = crop.split()
+                    # Check if all words of the crop variety are in the identified_crop
+                    if all(word in identified_crop_words for word in crop_words):
+                        crop_found = True
+                        break
+                
+                if not crop_found:
+                    # Crop variety not found in the list
+                    available_crops = ", ".join(crop_varieties[:10])  # Show first 10 varieties
+                    if len(crop_varieties) > 10:
+                        available_crops += f" (y {len(crop_varieties) - 10} más)"
+                    
+                    await message.answer(
+                        f"❌ La variedad de cultivo '{identified_crop}' no está registrada en tu granja.\n\n"
+                        f"🌱 Variedades disponibles: {available_crops}\n\n"
+                        f"Por favor, reformula tu mensaje usando una de las variedades disponibles o usa /crop_varieties para ver la lista completa."
+                    )
+                    return  # Exit without registering the transaction
+            else:
+                await message.answer(
+                    "❌ El tipo de movimiento que especificaste no se encuentra contemplado. Puedes usar /revenue_types para ver los tipos de ingresos disponibles.\n\n"
+                )
+                return
 
         # Check for missing fields in the API response
         missing_fields = []
