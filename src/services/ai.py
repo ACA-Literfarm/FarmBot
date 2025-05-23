@@ -15,28 +15,24 @@ Args:
     farm_id (str): The farm ID for context.
     token (str): The authorization token for API requests.
     include_revenue_types (bool): Whether to include revenue types in the prompt.
+    revenue_types (list[str]): A list of revenue type names.
+    include_crop_varieties (bool): Whether to include crop varieties in the prompt.
+    crop_varieties (list[str]): A list of crop variety names.
 
 Returns:
     str: The AI model's response.
 """
 from typing import Optional
 
-async def query_ai_model(user_message: str, 
-                         farm_id: Optional[str] = None, 
-                         token: Optional[str] = None, 
-                         include_revenue_types: bool = False,
-                         revenue_types: Optional[list[str]] = None) -> str:
+async def query_ai_model(user_message: str,
+                         revenue_types: Optional[list[str]] = None,
+                         crop_varieties: Optional[list[str]] = None) -> str:
     try:
-        # Prepare the system prompt
-        if include_revenue_types:
-            if not farm_id or not token:
-                return "⚠️ Missing required parameters: farm_id and token are needed to include revenue types."
-
-            # Generate the prompt dynamically with revenue types
-            system_prompt = generate_financial_prompt(include_revenue_types=True, revenue_types=revenue_types)
-        else:
-            # Generate the prompt without revenue types
-            system_prompt = generate_financial_prompt(include_revenue_types=False)
+        # Generate the system prompt dynamically
+        system_prompt = generate_financial_prompt(
+            revenue_types=revenue_types,
+            crop_varieties=crop_varieties
+        )
 
         # Prepare the messages for the AI model
         messages = [
