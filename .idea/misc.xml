@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.13 (FarmBot)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.13 (FarmBot)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.13 virtualenv at ~/para/Projects/FarmBot/env" project-jdk-type="Python SDK" />
 </project>
