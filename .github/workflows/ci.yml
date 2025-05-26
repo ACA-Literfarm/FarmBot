@@ -1,10 +1,10 @@
-name: CI
+name: CI en feature/MPV-github-actions
 
 on:
   push:
-    branches: [ main ]
+    branches: [ feature/MPV-github-actions ]
   pull_request:
-    branches: [ main ]
+    branches: [ feature/MPV-github-actions ]
 
 jobs:
   test:
