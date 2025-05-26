@@ -2,21 +2,24 @@ from flask import Flask, redirect, url_for, request, session, abort, flash, rend
 import requests
 import secrets
 from urllib.parse import urlencode
-from dotenv import load_dotenv
+import sys
 import os
 
-load_dotenv()
+# Add the src directory to the Python path to import config
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+from config import config
+
+# Validate Flask-specific environment variables
+config.validate_flask_vars()
 
 app = Flask(__name__)
 # Set a secret key for session management
-app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_urlsafe(32))
-google_client_id = os.getenv('GOOGLE_CLIENT_ID')
-google_client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+app.secret_key = config.FLASK_SECRET_KEY or secrets.token_urlsafe(32)
 
 app.config['OAUTH2_PROVIDERS'] = {
     'google': {
-        'client_id': google_client_id,
-        'client_secret': google_client_secret,
+        'client_id': config.GOOGLE_CLIENT_ID,
+        'client_secret': config.GOOGLE_CLIENT_SECRET,
         'authorize_url': 'https://accounts.google.com/o/oauth2/auth',
         'token_url': 'https://accounts.google.com/o/oauth2/token',
         'userinfo': {
