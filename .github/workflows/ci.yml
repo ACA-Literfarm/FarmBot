@@ -31,6 +31,12 @@ jobs:
 
     - name: Run tests with HTML report
       env:
-        TELEGRAM_API_KEY: dummy-key-for-tests
+        TELEGRAM_API_KEY: dummy-telegram-key
+        AI_API_KEY: dummy-ai-key
+        MODEL_NAME: dummy-model
+        GOOGLE_CLIENT_ID: dummy-google-client-id
+        GOOGLE_CLIENT_SECRET: dummy-google-secret
+        LINK_SERVER: http://dummy-server
+        URL_LITEFARM: http://dummy-litefarm
       run: |
         PYTHONPATH=$(pwd) pytest -v --html=report.html --self-contained-html
