@@ -2,8 +2,10 @@ import json
 import logging
 from datetime import datetime, date
 from aiogram.types import Message
+from aiogram.enums import ChatAction
 from services.ai_service import query_ai_model
-from services.api_service import handle_api_transaction, request_expense_types
+from services.api_service import handle_api_transaction, request_expense_types, request_revenue_types, request_crop_varieties
+from services.typing_context import show_typing
 
 # Diccionario para rastrear el estado del usuario
 user_states = {}
@@ -29,6 +31,102 @@ def format_date_for_display(date_str: str) -> str:
         # If invalid date format, use today's date as fallback
         return date.today().strftime("%d/%m/%Y")
 
+def validate_revenue_type(api_response: dict, revenue_types: list) -> tuple[bool, str, str]:
+    """
+    Validate if the revenue type exists in the available revenue types.
+    
+    Returns:
+        tuple: (is_valid, revenue_type_name, error_message)
+    """
+    selected_revenue_type = api_response.get("type", "")
+    
+    # Convert to string and strip if it's not already a string
+    if isinstance(selected_revenue_type, (int, float)):
+        selected_revenue_type = str(selected_revenue_type)
+    else:
+        selected_revenue_type = str(selected_revenue_type).strip()
+    
+    available_revenue_types = [f"ID: {item.get('revenue_type_id')} - {item.get('revenue_name')}" for item in revenue_types if isinstance(item, dict)]
+    
+    # Find the revenue type by ID
+    for item in revenue_types:
+        if isinstance(item, dict) and str(item.get('revenue_type_id', '')) == str(selected_revenue_type):
+            return True, item.get('revenue_name', ''), ""
+    
+    # If not found, create error message with available options
+    revenue_options = [
+        f"• {item.get('revenue_name', '')}" 
+        for item in revenue_types 
+        if isinstance(item, dict) and item.get('revenue_name')
+    ]
+    
+    error_msg = (
+        "No pude identificar un tipo de ingreso específico. "
+        "Por favor, asegúrate de que el mensaje incluya un tipo de ingreso válido.\n\n"
+        f"Tipos de ingresos disponibles:\n{chr(10).join(revenue_options)}"
+    )
+    
+    return False, "", error_msg
+
+def validate_crop_variety(api_response: dict, crop_varieties: list) -> tuple[bool, str, str]:
+    """
+    Validate if the crop variety exists in the available crop varieties.
+    
+    Returns:
+        tuple: (is_valid, crop_variety_name, error_message)
+    """
+    crop_variety_id = api_response.get("crop_variety", "")
+    
+    # Enhanced logging for debugging
+    available_varieties = [f"ID: {item.get('crop_variety_id')} - {item.get('crop_variety_name')}" for item in crop_varieties if isinstance(item, dict)]
+    
+    if not crop_variety_id:
+        # Create available crop varieties list for error message
+        crop_variety_list = "\n".join(
+            f"• {item.get('crop_variety_name', '')}"
+            for item in crop_varieties 
+            if isinstance(item, dict) and item.get('crop_variety_name')
+        )
+        
+        error_msg = (
+            "No pude identificar una variedad de cultivo disponible en tu granja. "
+            "Por favor, asegúrate de que el mensaje incluya una variedad de cultivo válida.\n\n"
+            f"Variedades de cultivo disponibles:\n{crop_variety_list}"
+        )
+        
+        return False, "", error_msg
+    
+    # Find the crop variety by ID
+    for item in crop_varieties:
+        if isinstance(item, dict) and str(item.get('crop_variety_id', '')) == str(crop_variety_id):
+            crop_name = item.get('crop_variety_name', '')
+            return True, f"Venta de {crop_name}", ""
+    
+    # If crop variety ID not found in list
+    crop_variety_list = "\n".join(
+        f"• {item.get('crop_variety_name', '')}"
+        for item in crop_varieties 
+        if isinstance(item, dict) and item.get('crop_variety_name')
+    )
+    
+    error_msg = (
+        "No pude identificar una variedad de cultivo específica para la venta. "
+        "Por favor, asegúrate de que el mensaje incluya una variedad de cultivo válida.\n\n"
+        f"Variedades de cultivo disponibles:\n{crop_variety_list}"
+    )
+    
+    return False, "", error_msg
+
+def format_currency_value(value: str) -> str:
+    """Format currency value for display."""
+    try:
+        if value:
+            numeric_value = float(value.replace(",", ""))
+            return f"${numeric_value:,.0f}"
+        return ""
+    except (ValueError, AttributeError):
+        return f"${value}" if value else ""
+
 async def handle_regular_message(message: Message):
     user_id = message.from_user.id  # Identificar al usuario por su ID
     user_input = message.text.strip()
@@ -52,9 +150,15 @@ async def handle_regular_message(message: Message):
         else:
             # Todos los campos están completos
             api_response = state["api_response"]
-            del user_states[user_id]  # Limpiar el estado del usuario
-            await handle_api_transaction(api_response)
-            await message.answer(state["respuesta"])  # Responder con el mensaje original de la IA
+            del user_states[user_id]
+            
+            # Apply default customer if empty for revenue
+            if api_response.get("customer") == "":
+                api_response["customer"] = "Cliente General"
+            
+            async with show_typing(message):
+                await handle_api_transaction(api_response)
+            await message.answer(state["respuesta"])
             return
 
     # Si no hay estado previo, procesar el mensaje normalmente
@@ -62,23 +166,37 @@ async def handle_regular_message(message: Message):
         await message.answer("⚠️ El mensaje está vacío. Por favor, escribe algo para que pueda ayudarte.")
         return
 
-    # Request expense types from litefarm API 
-    expense_type = await request_expense_types()
+    # Mostrar escritura mientras se obtienen datos y se procesa la IA
+    async with show_typing(message):
+        # Solicitar todos los tipos de datos
+        expense_type = await request_expense_types()
+        if expense_type is None:
+            await message.answer("Hubo un error en el servidor obteniendo tipos de gastos, intentalo mas tarde.")
+            return
+        
+        revenue_type = await request_revenue_types()
+        if revenue_type is None or len(revenue_type) < 1:
+            await message.answer("Hubo un error en el servidor obteniendo tipos de ingresos, intentalo mas tarde.")
+            return
 
-    # Check if there was an error getting expense types
-    if expense_type is None:
-        await message.answer("Hubo un error en el servidor obteninendo tipos de gastos, intentalo mas tarde.")
-        return
+        crop_varieties = await request_crop_varieties()
+        
+        if crop_varieties is None or len(crop_varieties) < 1:
+            await message.answer("Hubo un error en el servidor obteniendo variedades de cultivos, intentalo mas tarde.")
+            return
 
-    # Query the AI model with the user's input and available expense types
-    response_text = await query_ai_model(user_input, expense_type)
+        # Consultar el modelo de IA
+        response_text = await query_ai_model(user_input, expense_type, revenue_type, crop_varieties)
 
+    # Procesar la respuesta (sin necesidad de escribir aquí ya que es rápido)
     try:
         data = json.loads(response_text)
 
         clasificacion = data.get("clasificacion")
         respuesta = data.get("respuesta")
-        api_response = data.get("respuesta_api", {"note": "", "value": "", "type": "", "date": ""})
+        api_response = data.get("respuesta_api", {
+            "note": "", "value": "", "type": "", "date": "", "crop_variety": "", "customer": ""
+        })
 
         # When an expense is detected, show available expense types
         # What it does: Based on the list of expense types, it formats them for user display.
@@ -113,25 +231,50 @@ async def handle_regular_message(message: Message):
                 note = api_response.get("note", "")
                 value = api_response.get("value", "")
                 transaction_date = format_date_for_display(api_response.get("date", ""))
-                
-                # Format currency value for display
-                try:
-                    if value:
-                        # Convert string to number and format with commas
-                        numeric_value = float(value.replace(",", ""))
-                        formatted_value = f"${numeric_value:,.0f}"
-                    else:
-                        formatted_value = ""
-                except (ValueError, AttributeError):
-                    # If conversion fails, just use the original value with $ prefix
-                    formatted_value = f"${value}" if value else ""
+                formatted_value = format_currency_value(value)
 
-                # Create the response message with the selected type and transaction details
                 respuesta = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
             else:
                 respuesta = "No pude identificar un tipo de gasto específico. Por favor, asegúrate de que el mensaje incluya un tipo de gasto válido.\n\n" + respuesta
 
-        if clasificacion == "no_relacionado":
+        # Handle revenue classification
+        elif clasificacion == "ingreso":
+            # Validate revenue type
+            is_valid_revenue, revenue_name, revenue_error = validate_revenue_type(api_response, revenue_type)
+            
+            if not is_valid_revenue:
+                await message.answer(revenue_error)
+                return
+            
+            # Check if it's a crop sale and validate crop variety
+            selected_crop_name = revenue_name  # Default to revenue type name
+            
+            if revenue_name.strip().lower() == "crop sale":
+                is_valid_crop, crop_name, crop_error = validate_crop_variety(api_response, crop_varieties)
+                
+                if not is_valid_crop:
+                    await message.answer(crop_error)
+                    return
+                
+                selected_crop_name = crop_name
+
+            # Handle customer field - set default if empty
+            customer_name = api_response.get("customer", "").strip()
+            if not customer_name:
+                api_response["customer"] = "Cliente General"
+                customer_name = "Cliente General"
+
+            # Format transaction details
+            note = api_response.get("note", "")
+            value = api_response.get("value", "")
+            transaction_date = format_date_for_display(api_response.get("date", ""))
+            formatted_value = format_currency_value(value)
+            
+            # Create success response with customer info
+            respuesta = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
+
+        # Handle non-related classification
+        elif clasificacion == "no_relacionado":
             respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles y ejemplos de uso."
             await message.answer(respuesta)
             return  # Salir sin completar datos
@@ -162,8 +305,14 @@ async def handle_regular_message(message: Message):
                 await message.answer("📂 Faltó el tipo de transacción. Por favor, indícalo (por ejemplo: gasolina, maquinaria, plantas, otro):")
             return
 
-        # Manejar la respuesta de la API
-        await handle_api_transaction(api_response)
+        # Apply default customer if empty for revenue
+        if clasificacion == "ingreso" and not api_response.get("customer"):
+            api_response["customer"] = "Cliente General"
+
+        # Process final transaction
+        async with show_typing(message):
+            await handle_api_transaction(api_response)
+        
         await message.answer(respuesta)
 
     except json.JSONDecodeError:
