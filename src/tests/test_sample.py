@@ -6,12 +6,14 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 # Asegurar que src/ esté en PYTHONPATH
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.services.ai_service import query_ai_model
-from src.services.api_service import handle_api_transaction
-from src.prompts import FINANCIAL_CLASSIFIER_PROMPT
+from services.ai_service import query_ai_model
+from services.api_service import handle_api_transaction
+from prompts import FINANCIAL_CLASSIFIER_PROMPT
 
 # Dummy expense types para pasar a query_ai_model
 DUMMY_EXPENSE_TYPES = [{"expense_type_id": "1", "expense_name": "dummy"}]
+DUMMY_REVENUE_TYPES = [{"revenue_type_id": "1", "revenue_name": "dummy"}]
+DUMMY_CROP_VARIETIES = [{"crop_variety_id": "1", "crop_variety_name": "dummy"}]
 
 # Utilidad para crear una respuesta falsa tipo OpenAI
 def make_fake_response(content_str: str):
@@ -37,17 +39,17 @@ async def test_handle_api_transaction_logs(caplog):
         assert "plantas" in caplog.text
 
 @pytest.mark.asyncio
-@patch("src.main.client.chat.completions.create", new_callable=AsyncMock)
+@patch("services.ai_service.client.chat.completions.create", new_callable=AsyncMock)
 async def test_query_ai_model(mock_create):
     user_input = "Gasté 300 en semillas"
     json_text = json.dumps({
         "clasificacion": "gasto",
         "respuesta": "He registrado un gasto 💰",
-        "respuesta_api": {"note": "Compra de semillas", "value": "300", "type": "plantas"}
+        "respuesta_api": {"note": "Compra de semillas", "value": "300", "type": "plantas", "date": "2025-05-26"}
     })
     mock_create.return_value = make_fake_response(json_text)
 
-    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES)
+    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES, DUMMY_REVENUE_TYPES, DUMMY_CROP_VARIETIES)
     parsed = json.loads(result)
     assert parsed["clasificacion"] == "gasto"
     assert "💰" in parsed["respuesta"]
@@ -62,82 +64,95 @@ def test_prompt_exists():
 # ------------------------
 
 @pytest.mark.asyncio
-@patch("src.main.client.chat.completions.create", new_callable=AsyncMock)
+@patch("services.ai_service.client.chat.completions.create", new_callable=AsyncMock)
 async def test_query_ai_model_gasto_fertilizando(mock_create):
     user_input = "Gasto 10 en fertilizante"
     json_text = json.dumps({
         "clasificacion": "gasto",
         "respuesta": "He registrado el gasto",
-        "respuesta_api": {"note": "gasto en fertilizante", "value": "10.0", "type": "Control de plagas"}
+        "respuesta_api": {"note": "gasto en fertilizante", "value": "10.00", "type": "Control de plagas", "date": "2025-05-26"}
     })
     mock_create.return_value = make_fake_response(json_text)
 
-    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES)
+    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES, DUMMY_REVENUE_TYPES, DUMMY_CROP_VARIETIES)
     parsed = json.loads(result)
     assert parsed["clasificacion"] == "gasto"
-    assert parsed["respuesta_api"]["value"] == "10.0"
+    assert parsed["respuesta_api"]["value"] == "10.00"
 
 @pytest.mark.asyncio
-@patch("src.main.client.chat.completions.create", new_callable=AsyncMock)
+@patch("services.ai_service.client.chat.completions.create", new_callable=AsyncMock)
 async def test_query_ai_model_gasto_incompleto(mock_create):
     user_input = "Consumi gasolina"
-    # respuesta directa del modelo sin JSON
-    content = "Por favor indica el monto del gasto."
-    mock_create.return_value = make_fake_response(content)
+    # Test for incomplete transaction that needs missing fields
+    json_text = json.dumps({
+        "clasificacion": "gasto", 
+        "respuesta": "Por favor indica el monto del gasto.",
+        "respuesta_api": {"note": "Consumo de gasolina", "value": "", "type": "1", "date": "", "crop_variety": "", "customer": ""}
+    })
+    mock_create.return_value = make_fake_response(json_text)
 
-    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES)
-    assert content in result
+    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES, DUMMY_REVENUE_TYPES, DUMMY_CROP_VARIETIES)
+    parsed = json.loads(result)
+    assert "monto" in parsed["respuesta"]
 
 @pytest.mark.asyncio
-@patch("src.main.client.chat.completions.create", new_callable=AsyncMock)
+@patch("services.ai_service.client.chat.completions.create", new_callable=AsyncMock)
 async def test_query_ai_model_ingreso_valido(mock_create):
     user_input = "Ayer vendí 1 kilo de tomates por 15 a David"
     json_text = json.dumps({
         "clasificacion": "ingreso",
-        "respuesta_api": {"nombre_cliente": "David", "fecha": "ayer", "cultivo": "tomate", "cantidad": "1", "unidad_medida": "kg", "monto": "15"}
+        "respuesta_api": {"nombre_cliente": "David", "fecha": "ayer", "cultivo": "tomate", "cantidad": "1", "unidad_medida": "kg", "monto": "15", "date": "2025-05-25"}
     })
     mock_create.return_value = make_fake_response(json_text)
 
-    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES)
+    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES, DUMMY_REVENUE_TYPES, DUMMY_CROP_VARIETIES)
     parsed = json.loads(result)
     assert parsed["clasificacion"] == "ingreso"
 
 @pytest.mark.asyncio
-@patch("src.main.client.chat.completions.create", new_callable=AsyncMock)
+@patch("services.ai_service.client.chat.completions.create", new_callable=AsyncMock)
 async def test_query_ai_model_ingreso_incompleto(mock_create):
     user_input = "Ayer vendí tomates por 15 a David"
-    content = "Por favor indica la cantidad del cultivo vendido."
-    mock_create.return_value = make_fake_response(content)
+    # Test incomplete revenue transaction
+    json_text = json.dumps({
+        "clasificacion": "ingreso",
+        "respuesta": "Por favor indica la cantidad del cultivo vendido.",
+        "respuesta_api": {"note": "", "value": "", "type": "1", "date": "2025-05-25", "crop_variety": "", "customer": ""}
+    })
+    mock_create.return_value = make_fake_response(json_text)
 
-    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES)
-    assert content in result
+    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES, DUMMY_REVENUE_TYPES, DUMMY_CROP_VARIETIES)
+    parsed = json.loads(result)
+    assert "cantidad" in parsed["respuesta"]
 
 @pytest.mark.asyncio
-@patch("src.main.client.chat.completions.create", new_callable=AsyncMock)
+@patch("services.ai_service.client.chat.completions.create", new_callable=AsyncMock)
 async def test_query_ai_model_irrelevante(mock_create):
     user_input = "Hola, ¿cómo estás?"
     json_text = json.dumps({
         "clasificacion": "no_relacionado",
-        "respuesta": "Estoy aquí para ayudarte a registrar transacciones.",
+        "respuesta": "Estoy aquí para ayudarte a registrar gastos e ingresos agrícolas.",
         "respuesta_api": {}
     })
     mock_create.return_value = make_fake_response(json_text)
 
-    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES)
+    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES, DUMMY_REVENUE_TYPES, DUMMY_CROP_VARIETIES)
     parsed = json.loads(result)
-    assert "transacciones" in parsed["respuesta"]
+    assert "agrícolas" in parsed["respuesta"]
 
 @pytest.mark.asyncio
-@patch("src.main.client.chat.completions.create", side_effect=Exception("API caída"))
+@patch("services.ai_service.client.chat.completions.create", side_effect=Exception("API caída"))
 async def test_query_ai_model_logs_error(mock_create, caplog):
     user_input = "Vender manzanas"
     with caplog.at_level("ERROR"):
-        result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES)
-        assert result.startswith("⚠️")
+        result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES, DUMMY_REVENUE_TYPES, DUMMY_CROP_VARIETIES)
+        # The error response is now in JSON format
+        parsed = json.loads(result)
+        assert "⚠️" in parsed["respuesta"]
         assert "API caída" in caplog.text
 
 @pytest.mark.asyncio
-@patch("src.main.client.chat.completions.create", new_callable=AsyncMock)
+@patch("services.ai_service.client.chat.completions.create", new_callable=AsyncMock)
 async def test_query_ai_model_transaccion_guiada(mock_create):
     user_input = "Hice un gasto"
     json_text = json.dumps({
@@ -147,21 +162,21 @@ async def test_query_ai_model_transaccion_guiada(mock_create):
     })
     mock_create.return_value = make_fake_response(json_text)
 
-    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES)
+    result = await query_ai_model(user_input, DUMMY_EXPENSE_TYPES, DUMMY_REVENUE_TYPES, DUMMY_CROP_VARIETIES)
     parsed = json.loads(result)
     assert "monto" in parsed["respuesta"]
 
 @pytest.mark.asyncio
-@patch("src.main.client.chat.completions.create", new_callable=AsyncMock)
+@patch("services.ai_service.client.chat.completions.create", new_callable=AsyncMock)
 async def test_query_ai_model_multiple_transacciones(mock_create):
     # Primer llamada
-    json1 = json.dumps({"clasificacion": "gasto", "respuesta_api": {"note": "abono", "value": "100", "type": "suelo"}})
+    json1 = json.dumps({"clasificacion": "gasto", "respuesta_api": {"note": "abono", "value": "100", "type": "suelo", "date": "2025-05-26"}})
     # Segunda llamada
-    json2 = json.dumps({"clasificacion": "ingreso", "respuesta_api": {"nombre_cliente": "Luis", "fecha": "hoy", "cultivo": "lechuga", "cantidad": "3", "unidad_medida": "kg", "monto": "90"}})
+    json2 = json.dumps({"clasificacion": "ingreso", "respuesta_api": {"nombre_cliente": "Luis", "fecha": "hoy", "cultivo": "lechuga", "cantidad": "3", "unidad_medida": "kg", "monto": "90", "date": "2025-05-26"}})
     mock_create.side_effect = [make_fake_response(json1), make_fake_response(json2)]
 
-    r1 = await query_ai_model("Gasté 100 en abono", DUMMY_EXPENSE_TYPES)
-    r2 = await query_ai_model("Hoy vendí lechuga", DUMMY_EXPENSE_TYPES)
+    r1 = await query_ai_model("Gasté 100 en abono", DUMMY_EXPENSE_TYPES, DUMMY_REVENUE_TYPES, DUMMY_CROP_VARIETIES)
+    r2 = await query_ai_model("Hoy vendí lechuga", DUMMY_EXPENSE_TYPES, DUMMY_REVENUE_TYPES, DUMMY_CROP_VARIETIES)
     p1, p2 = json.loads(r1), json.loads(r2)
     assert p1["clasificacion"] == "gasto"
     assert p2["clasificacion"] == "ingreso"
