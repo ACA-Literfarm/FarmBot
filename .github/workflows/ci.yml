@@ -1,10 +1,10 @@
-name: CI en feature/MPV-github-actions
+name: CI in develop
 
 on:
   push:
-    branches: [ feature/MPV-github-actions ]
+    branches: [ develop, feature/MPV-github-actions ]
   pull_request:
-    branches: [ feature/MPV-github-actions ]
+    branches: [ develop, feature/MPV-github-actions ]
 
 jobs:
   test:
@@ -40,3 +40,9 @@ jobs:
         URL_LITEFARM: http://dummy-litefarm
       run: |
         PYTHONPATH=$(pwd) pytest -v --html=report.html --self-contained-html
+
+    - name: Upload pytest report
+      uses: actions/upload-artifact@v4
+      with:
+        name: pytest-report
+        path: report.html
