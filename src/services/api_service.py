@@ -1,15 +1,8 @@
-import os
 import logging
 import json
 import requests
 from typing import Dict, Any, Optional, List
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-
-# Get environment variables
-URL_LITEFARM = os.getenv("URL_LITEFARM")
+from config import config
 
 async def handle_api_transaction(api_response: Dict[str, Any]) -> None:
     """
@@ -31,12 +24,12 @@ async def request_expense_types() -> Optional[List[Dict[str, Any]]]:
     Returns:
         List of expense types if successful, None if there was an error
     """
-    if not URL_LITEFARM:
+    if not config.URL_LITEFARM:
         logging.error("URL_LITEFARM environment variable not set")
         return None
         
     try:
-        response = requests.get(f"{URL_LITEFARM}/expense_type/all")
+        response = requests.get(f"{config.URL_LITEFARM}/expense_type/all")
         if response.status_code == 200:
             data = response.json()
             if not data:  # Check if response is empty

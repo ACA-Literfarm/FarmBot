@@ -1,29 +1,15 @@
-import os
 import logging
 from typing import List, Dict, Any
 from openai import AsyncOpenAI
-from dotenv import load_dotenv
 from prompts import FINANCIAL_CLASSIFIER_PROMPT
+from config import config
 
-# Load environment variables
-load_dotenv()
-
-# Get environment variables
-AI_API_KEY = os.getenv("AI_API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME")
-
-if not AI_API_KEY:
-    raise ValueError("Please set the AI_API_KEY environment variable.")
-
-if not MODEL_NAME:
-    raise ValueError("Please set the MODEL_NAME environment variable.")
-
-if FINANCIAL_CLASSIFIER_PROMPT is None:
-    raise ValueError("Please set the FINANCIAL_CLASSIFIER_PROMPT environment variable.")
+# Validate required environment variables
+config.validate_required_vars()
 
 # Initialize OpenAI client
 client = AsyncOpenAI(
-    api_key=AI_API_KEY,
+    api_key=config.AI_API_KEY,
     # base_url="https://api.deepseek.com", # Uncomment if using Deepseek
 )
 
@@ -59,7 +45,7 @@ async def query_ai_model(user_message: str, expense_type: List[Dict[str, Any]]) 
         ]
 
         response = await client.chat.completions.create(
-            model=MODEL_NAME,
+            model=config.MODEL_NAME,
             messages=messages,
             max_tokens=150,
             temperature=0.3,
