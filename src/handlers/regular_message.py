@@ -1,11 +1,33 @@
 import json
 import logging
+from datetime import datetime, date
 from aiogram.types import Message
 from services.ai_service import query_ai_model
 from services.api_service import handle_api_transaction, request_expense_types
 
 # Diccionario para rastrear el estado del usuario
 user_states = {}
+
+def format_date_for_display(date_str: str) -> str:
+    """
+    Convert date from YYYY-MM-DD format to DD/MM/YYYY format for display.
+    
+    Args:
+        date_str: Date string in YYYY-MM-DD format
+        
+    Returns:
+        Formatted date string in DD/MM/YYYY format
+    """
+    try:
+        if date_str:
+            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+            return date_obj.strftime("%d/%m/%Y")
+        else:
+            # If no date provided, use today's date
+            return date.today().strftime("%d/%m/%Y")
+    except ValueError:
+        # If invalid date format, use today's date as fallback
+        return date.today().strftime("%d/%m/%Y")
 
 async def handle_regular_message(message: Message):
     user_id = message.from_user.id  # Identificar al usuario por su ID
@@ -56,7 +78,7 @@ async def handle_regular_message(message: Message):
 
         clasificacion = data.get("clasificacion")
         respuesta = data.get("respuesta")
-        api_response = data.get("respuesta_api", {"note": "", "value": "", "type": ""})
+        api_response = data.get("respuesta_api", {"note": "", "value": "", "type": "", "date": ""})
 
         # When an expense is detected, show available expense types
         # What it does: Based on the list of expense types, it formats them for user display.
@@ -87,9 +109,25 @@ async def handle_regular_message(message: Message):
                     # If we couldn't find the ID in the list, maybe the AI sent the name directly
                     selected_name = selected_type
 
-                # Prepare the list of expense options
-                expense_list = "\n".join(expense_options)
-                respuesta = f"De los siguientes tipos de gastos:\n\n{expense_list}\n\nSeleccioné este tipo: {selected_name}\n\n{respuesta}"
+                # Get the transaction details for display
+                note = api_response.get("note", "")
+                value = api_response.get("value", "")
+                transaction_date = format_date_for_display(api_response.get("date", ""))
+                
+                # Format currency value for display
+                try:
+                    if value:
+                        # Convert string to number and format with commas
+                        numeric_value = float(value.replace(",", ""))
+                        formatted_value = f"${numeric_value:,.0f}"
+                    else:
+                        formatted_value = ""
+                except (ValueError, AttributeError):
+                    # If conversion fails, just use the original value with $ prefix
+                    formatted_value = f"${value}" if value else ""
+
+                # Create the response message with the selected type and transaction details
+                respuesta = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
             else:
                 respuesta = "No pude identificar un tipo de gasto específico. Por favor, asegúrate de que el mensaje incluya un tipo de gasto válido.\n\n" + respuesta
 
@@ -106,6 +144,7 @@ async def handle_regular_message(message: Message):
             missing_fields.append("value")
         if not api_response.get("type"):
             missing_fields.append("type")
+        # Note: date is optional, if not provided we'll use today's date
 
         if missing_fields:
             # Guardar el estado del usuario

@@ -9,13 +9,14 @@ async def handle_api_transaction(api_response: Dict[str, Any]) -> None:
     Handle API transaction by logging the transaction details.
     
     Args:
-        api_response: Dictionary containing transaction details (note, value, type)
+        api_response: Dictionary containing transaction details (note, value, type, date)
     """
     note = api_response.get("note")
     value = api_response.get("value")
     type_ = api_response.get("type")
+    date_ = api_response.get("date")
 
-    logging.info(f"API Transaction: Note: {note}, Value: {value}, Type: {type_}")
+    logging.info(f"API Transaction: Note: {note}, Value: {value}, Type: {type_}, Date: {date_}")
 
 ## Request expense types from LiteFarm API
 async def request_expense_types() -> Optional[List[Dict[str, Any]]]:

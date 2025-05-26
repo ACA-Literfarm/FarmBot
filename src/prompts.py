@@ -15,7 +15,8 @@ Responde **exclusivamente** en el siguiente formato JSON, sin añadir texto adic
   "respuesta_api": {
     "note": "Descripción breve del mensaje del usuario",
     "value": "Monto numérico relacionado con el mensaje, o vacío si no aplica",
-    "type": "ID o nombre del tipo de gasto seleccionado de la lista proporcionada en 'Expense types'"
+    "type": "ID o nombre del tipo de gasto seleccionado de la lista proporcionada en 'Expense types'",
+    "date": "Fecha en formato YYYY-MM-DD extraída del mensaje, o vacío si no se menciona fecha específica"
   }
 }
 
@@ -27,12 +28,15 @@ Ejemplo válido:
   "respuesta_api": {
     "note": "Compra de productos agrícolas",
     "value": "1000",
-    "type": "plantas"
+    "type": "plantas",
+    "date": ""
   }
 }
 
 Instrucciones adicionales:
-- La clave `respuesta_api` debe contener siempre las claves `note`, `value` y `type`.
+- La clave `respuesta_api` debe contener siempre las claves `note`, `value`, `type` y `date`.
+- Si el usuario menciona una fecha específica (como "el día 10/12/2024", "ayer", "hoy", etc.), extráela y conviértela al formato YYYY-MM-DD para el campo `date`.
+- Si no se menciona fecha específica, deja el campo `date` vacío (la aplicación usará la fecha actual por defecto).
 - El mensaje siempre será en primera persona. No intentes corregir palabras soeces, sexuales o 
   violentas, estas deben ser clasificadas como "no_relacionado".
 - Si el mensaje es irrelevante, responde de forma breve, cordial y redirige a la sección de ayuda.

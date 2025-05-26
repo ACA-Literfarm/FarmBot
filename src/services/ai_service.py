@@ -1,3 +1,4 @@
+from datetime import date
 import logging
 from typing import List, Dict, Any
 from openai import AsyncOpenAI
@@ -37,12 +38,16 @@ async def query_ai_model(user_message: str, expense_type: List[Dict[str, Any]]) 
 
         # Prepare the context for the AI model, including available expense types obtained from litefarm API.
         expense_context = "Expense types available:\n" + "\n".join(formatted_expense_types) if formatted_expense_types else "No expense types available"
+        # Today date in ISO format
+        today_date = date.today().isoformat()
 
         # Prepare the context messages for the AI model to analyze.
         messages = [
             {"role": "system", "content": FINANCIAL_CLASSIFIER_PROMPT},
             {"role": "system", "content": expense_context},
+            {"role": "system", "content": f"Today date: {today_date}"},
             {"role": "system", "content": "When user reports an expense, select the most appropriate expense type ID from the list above."},
+            {"role": "system", "content": "If the user mentions a specific date, extract it and format it as YYYY-MM-DD. Common date formats include: 'el día DD/MM/YYYY', 'DD/MM/YYYY', 'hoy' (today), 'ayer' (yesterday). If no specific date is mentioned, leave the date field empty."},
             {"role": "user", "content": user_message},
         ]
 
