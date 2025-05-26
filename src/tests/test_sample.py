@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 # Asegurar que src/ esté en PYTHONPATH
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.main import handle_api_transaction, query_ai_model
-from src.prompts import FINANCIAL_CLASSIFIER_PROMPT
+from src.services.ai_service import query_ai_model
+from src.services.api_service import handle_api_transaction
 
 # Dummy expense types para pasar a query_ai_model
 DUMMY_EXPENSE_TYPES = [{"expense_type_id": "1", "expense_name": "dummy"}]
