@@ -30,5 +30,7 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Run tests with HTML report
+      env:
+        TELEGRAM_API_KEY: dummy-key-for-tests
       run: |
         PYTHONPATH=$(pwd) pytest -v --html=report.html --self-contained-html
