@@ -13,6 +13,7 @@ config.validate_required_vars()
 # Initialize the bot and dispatcher
 dp = Dispatcher()
 
+
 # Register all message handlers
 register_handlers(dp)
 
