@@ -62,5 +62,5 @@ class Config:
             )
 
 
-# Create a global config instance
+# Create a global config instance (singleton pattern)
 config = Config()

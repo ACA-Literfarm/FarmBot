@@ -17,6 +17,7 @@ async def handle_api_transaction(api_response: Dict[str, Any]) -> None:
 
     logging.info(f"API Transaction: Note: {note}, Value: {value}, Type: {type_}")
 
+## Request expense types from LiteFarm API
 async def request_expense_types() -> Optional[List[Dict[str, Any]]]:
     """
     Request expense types from the LiteFarm API.
@@ -32,6 +33,7 @@ async def request_expense_types() -> Optional[List[Dict[str, Any]]]:
         response = requests.get(f"{config.URL_LITEFARM}/expense_type/all")
         if response.status_code == 200:
             data = response.json()
+            ## Validate if the response contains expected data (list of expense types)
             if not data:  # Check if response is empty
                 logging.error("Expense types response is empty")
                 return None

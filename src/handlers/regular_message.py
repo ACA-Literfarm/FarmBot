@@ -40,6 +40,7 @@ async def handle_regular_message(message: Message):
         await message.answer("⚠️ El mensaje está vacío. Por favor, escribe algo para que pueda ayudarte.")
         return
 
+    # Request expense types from litefarm API 
     expense_type = await request_expense_types()
 
     # Check if there was an error getting expense types
@@ -47,6 +48,7 @@ async def handle_regular_message(message: Message):
         await message.answer("Hubo un error en el servidor obteninendo tipos de gastos, intentalo mas tarde.")
         return
 
+    # Query the AI model with the user's input and available expense types
     response_text = await query_ai_model(user_input, expense_type)
 
     try:
@@ -57,6 +59,8 @@ async def handle_regular_message(message: Message):
         api_response = data.get("respuesta_api", {"note": "", "value": "", "type": ""})
 
         # When an expense is detected, show available expense types
+        # What it does: Based on the list of expense types, it formats them for user display.
+        # This will also show the selected expense type if it exists in the response.
         if clasificacion == "gasto":
             # Format expense types for user display
             expense_options = []
@@ -68,7 +72,7 @@ async def handle_regular_message(message: Message):
                         if expense_id and name:
                             expense_options.append(f"• {name}")
 
-            # If there are expense types available, suggest a selected one
+            # If there are expense options, include them in the response
             if expense_options and api_response.get("type"):
                 selected_type = api_response.get("type")
                 selected_name = ""
@@ -83,8 +87,11 @@ async def handle_regular_message(message: Message):
                     # If we couldn't find the ID in the list, maybe the AI sent the name directly
                     selected_name = selected_type
 
+                # Prepare the list of expense options
                 expense_list = "\n".join(expense_options)
                 respuesta = f"De los siguientes tipos de gastos:\n\n{expense_list}\n\nSeleccioné este tipo: {selected_name}\n\n{respuesta}"
+            else:
+                respuesta = "No pude identificar un tipo de gasto específico. Por favor, asegúrate de que el mensaje incluya un tipo de gasto válido.\n\n" + respuesta
 
         if clasificacion == "no_relacionado":
             respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles y ejemplos de uso."

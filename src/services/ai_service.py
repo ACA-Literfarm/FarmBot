@@ -35,8 +35,10 @@ async def query_ai_model(user_message: str, expense_type: List[Dict[str, Any]]) 
                     if expense_id and name:
                         formatted_expense_types.append(f"{expense_id}: {name}")
 
+        # Prepare the context for the AI model, including available expense types obtained from litefarm API.
         expense_context = "Expense types available:\n" + "\n".join(formatted_expense_types) if formatted_expense_types else "No expense types available"
 
+        # Prepare the context messages for the AI model to analyze.
         messages = [
             {"role": "system", "content": FINANCIAL_CLASSIFIER_PROMPT},
             {"role": "system", "content": expense_context},
@@ -44,6 +46,7 @@ async def query_ai_model(user_message: str, expense_type: List[Dict[str, Any]]) 
             {"role": "user", "content": user_message},
         ]
 
+        # Send the request to the AI model
         response = await client.chat.completions.create(
             model=config.MODEL_NAME,
             messages=messages,
@@ -51,6 +54,7 @@ async def query_ai_model(user_message: str, expense_type: List[Dict[str, Any]]) 
             temperature=0.3,
         )
 
+        # Return the AI's response content
         return response.choices[0].message.content
 
     except Exception as e:
