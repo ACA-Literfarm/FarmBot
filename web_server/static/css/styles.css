@@ -1,0 +1,212 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  background-color: #f8f9fa;
+  display: flex;
+  justify-content: center;
+  height: 100vh;
+}
+
+.container {
+  width: 100%;
+  max-width: 450px;
+}
+
+.login-card {
+  padding: 30px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Logo styling */
+.logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10vh 0 0;
+  justify-content: center;
+  margin-bottom: 30px;
+  position: relative;
+  width: 100%;
+}
+
+.telegram-logo {
+  font-size: 30px;
+  color: #0088cc;
+}
+
+.main-logo {
+    display: block;
+    max-width: 146px;
+    margin: 0 auto 10px auto;
+}
+
+/* Status messages */
+.status-message {
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-message i {
+  margin-right: 8px;
+  font-size: 18px;
+}
+
+.success-message {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.hidden {
+  display: none;
+}
+
+/* Login options styling */
+.login-options {
+  width: 100%;
+}
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  justify-content: center;
+  margin-bottom: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s;
+}
+
+.google-btn:hover {
+  background-color: #f5f5f5;
+}
+
+.google-btn img {
+  width: 18px;
+  margin-right: 10px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 20px 0;
+  color: #777;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+
+.divider span {
+  padding: 0 10px;
+}
+
+.email-form {
+
+  width: 100%;
+  height: 100%;
+}
+
+.form-group {
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.form-group input {
+  width: 100%;
+  height: 48px;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 40px;
+  cursor: pointer;
+  color: #777;
+}
+
+.login-btn {
+    display: block;
+    width: 100%;
+    height: 48px;
+    padding: 12px 20px;
+    background-color: #FFCF40; /* Color amarillo/dorado */
+    color: #8B6E00; /* Color de texto marrón/dorado oscuro */
+    border: none;
+    border-radius: 8px;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.login-btn:hover {
+    background-color: #FFD966; /* Un tono ligeramente más claro al pasar el mouse */
+}
+
+.login-btn:active {
+    transform: translateY(1px);
+    background-color: #F0C030; /* Un tono ligeramente más oscuro al hacer clic */
+}
+
+a {
+    text-decoration: none; /* Quita el subrayado */
+    color: inherit; /* Usa el color del texto del elemento padre */
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .container {
+    padding: 0 20px;
+  }
+
+  .login-card {
+    padding: 20px;
+  }
+
+  .telegram-logo {
+    font-size: 30px;
+  }
+}
