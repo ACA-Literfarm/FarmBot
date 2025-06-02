@@ -32,7 +32,7 @@ app.config['OAUTH2_PROVIDERS'] = {
     }
 }
 
-@app.route('/')
+@app.route('/login')
 def hello_world():
     return render_template('index.html')
 
