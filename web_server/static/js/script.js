@@ -18,53 +18,87 @@ document.addEventListener("DOMContentLoaded", () => {
   // Función para manejar el inicio de sesión con Google
   googleLoginBtn.addEventListener("click", () => {
     console.log("Iniciando sesión con Google...")
-    // Aquí iría la lógica de autenticación con Google usando el mismo API Token que LiteFarm
-    // Por ahora, simulamos un inicio de sesión exitoso
-    //simulateLogin(true)
+    // Google OAuth is handled by the server-side redirect
   })
 
   // Manejar el envío del formulario de correo electrónico y contraseña
-  emailLoginForm.addEventListener("submit", (e) => {
+  emailLoginForm.addEventListener("submit", async (e) => {
     e.preventDefault()
     const email = document.getElementById("email").value.trim()
     const password = passwordInput.value
 
-    if (email && password) {
-      console.log("Iniciando sesión con email:", email)
-      // Aquí iría la lógica de autenticación con email y contraseña
-      // Por ahora, simulamos un inicio de sesión exitoso o fallido aleatoriamente
-      const isSuccess = Math.random() > 0.5
-      simulateLogin(isSuccess)
-    } else {
+    if (!email || !password) {
       showError("Por favor, completa todos los campos")
+      return
+    }
+
+    // Hide any existing messages
+    hideMessages()
+
+    // Show loading state
+    const submitBtn = emailLoginForm.querySelector('button[type="submit"]')
+    const originalText = submitBtn.textContent
+    submitBtn.disabled = true
+    submitBtn.textContent = "Iniciando sesión..."
+
+    try {
+      // Get screen dimensions
+      const screenWidth = window.screen.width
+      const screenHeight = window.screen.height
+
+      // Prepare form data
+      const formData = new FormData()
+      formData.append('email', email)
+      formData.append('password', password)
+      formData.append('screen_width', screenWidth.toString())
+      formData.append('screen_height', screenHeight.toString())
+
+      // Send login request
+      const response = await fetch('/login', {
+        method: 'POST',
+        body: formData
+      })
+
+      const responseData = await response.json()
+
+      if (response.ok && responseData.success) {
+        // Successful login - redirect to success page
+        if (responseData.redirect) {
+          window.location.href = responseData.redirect
+        } else {
+          showSuccess("Inicio de sesión exitoso")
+        }
+      } else {
+        // Handle error response
+        const errorMessage = responseData.error || "Error al iniciar sesión"
+        showError(errorMessage)
+      }
+    } catch (error) {
+      console.error("Login error:", error)
+      showError("Error de conexión. Por favor, intenta nuevamente.")
+    } finally {
+      // Reset button state
+      submitBtn.disabled = false
+      submitBtn.textContent = originalText
     }
   })
 
-  // Función para simular el proceso de inicio de sesión
-  function simulateLogin(isSuccess) {
-    // Ocultar ambos mensajes primero
+  // Función para ocultar todos los mensajes
+  function hideMessages() {
     successMessage.classList.add("hidden")
     errorMessage.classList.add("hidden")
-
-    // Simular un tiempo de carga
-    setTimeout(() => {
-      if (isSuccess) {
-        showSuccess()
-      } else {
-        showError("Credenciales inválidas. Por favor, intenta nuevamente.")
-      }
-    }, 1000)
   }
 
   // Función para mostrar mensaje de éxito
-  function showSuccess() {
+  function showSuccess(message = "Inicio de sesión exitoso. Puedes regresar a Telegram.") {
+    successMessage.querySelector('i').nextSibling.textContent = ` ${message}`
     successMessage.classList.remove("hidden")
     errorMessage.classList.add("hidden")
   }
 
   // Función para mostrar mensaje de error
   function showError(message) {
-    errorMessage.textContent = message
+    errorMessage.querySelector('i').nextSibling.textContent = ` ${message}`
     errorMessage.classList.remove("hidden")
     successMessage.classList.add("hidden")
   }
