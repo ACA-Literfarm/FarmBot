@@ -3,8 +3,9 @@ import json
 import requests
 from typing import Dict, Any, Optional, List
 from config import config
+from datetime import datetime
 
-async def handle_api_transaction(api_response: dict):
+async def handle_api_transaction(api_response: dict, clasificacion: str) -> None:
     """
     Handle API transaction with customer support.
     """
@@ -15,11 +16,51 @@ async def handle_api_transaction(api_response: dict):
     crop_variety = api_response.get("crop_variety", "")
     customer = api_response.get("customer", "Cliente General")  # Default value
     
-    # Log the transaction details including customer
-    logging.info(f"API Transaction: Note: {note}, Value: {value}, Type: {transaction_type}, Date: {date}, Customer: {customer}")
-    
-    # Your existing API call logic here...
-    # Make sure to include customer in the API payload if supported
+    if clasificacion == "gasto":
+        await register_expense(
+            expense_date=date,
+            expense_type_id=transaction_type,
+            farm_id=config.FARM_ID,  # Assuming FARM_ID is set in config
+            note=note,
+            value=float(value)
+        )
+
+async def register_expense(expense_date: str, expense_type_id: int, farm_id: str, note: str, value: float) -> Optional[Dict[str, Any]]:
+    """
+    Register an expense in LiteFarm via POST request.
+    """
+
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "en",
+        "farm_id": farm_id,
+        "Authorization": f"Bearer {config.LOGIN_TOKEN}"  # Assuming LOGIN_TOKEN is set in config
+    }
+
+    payload = [{
+        "expense_date": datetime.strptime(expense_date, "%Y-%m-%d").isoformat() + "Z",
+        "expense_type_id": expense_type_id,
+        "farm_id": farm_id,
+        "note": note,
+        "value": value
+    }]
+
+    try:
+        response = requests.post(
+            f"{config.URL_LITEFARM}/expense/farm/{farm_id}",
+            headers=headers,
+            data=json.dumps(payload)
+        )
+        if response.status_code == 201:
+            logging.info("Expense registered successfully")
+            return response.json()
+        else:
+            logging.error(f"Error registering expense: {response.status_code} - {response.text}")
+            return None
+    except requests.RequestException as e: 
+        logging.error(f"Request error: {e}") #Dont know why this exception is triggering
+        return None
 
 ## Request expense types from LiteFarm API
 async def request_expense_types() -> Optional[List[Dict[str, Any]]]:
