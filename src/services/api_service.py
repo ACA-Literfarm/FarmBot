@@ -57,7 +57,7 @@ async def register_expense(expense_date: str, expense_type_id: int, farm_id: str
         "expense_type_id": expense_type_id,
         "farm_id": farm_id,
         "note": note,
-        "value": value
+        "value": float(value)
     }]
 
     try:
@@ -68,12 +68,15 @@ async def register_expense(expense_date: str, expense_type_id: int, farm_id: str
         )
         if response.status_code == 201:
             logging.info("Expense registered successfully")
-            return response.json()
+            try: # This is because the response might be empty
+                return response.json() if response.content else {"status": "success", "message": "Empty response"}
+            except ValueError:
+                return {"status": "success", "message": "No JSON returned"}
         else:
             logging.error(f"Error registering expense: {response.status_code} - {response.text}")
             return None
     except requests.RequestException as e: 
-        logging.error(f"Request error: {e}") #Dont know why this exception is triggering
+        logging.error(f"Expense request error: {e}") #Dont know why this exception is triggering
         return None
 
 async def register_sale(
@@ -117,7 +120,7 @@ async def register_sale(
             logging.error(f"Error registering sale: {response.status_code} - {response.text}")
             return None
     except requests.RequestException as e:
-        logging.error(f"Request error: {e}")
+        logging.error(f"Sale request error: {e}")
         return None
 
 ## Request expense types from LiteFarm API
@@ -145,7 +148,7 @@ async def request_expense_types() -> Optional[List[Dict[str, Any]]]:
             logging.error(f"Error fetching expense types: {response.status_code}")
             return None
     except requests.RequestException as e:
-        logging.error(f"Request error: {e}")
+        logging.error(f"Expense request error: {e}")
         return None
 
 # Request revenue types from LiteFarm API
@@ -206,7 +209,7 @@ async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
             logging.error(f"Error fetching revenue types: {response.status_code}")
             return None
     except requests.RequestException as e:
-        logging.error(f"Request error: {e}")
+        logging.error(f"Revenue request error: {e}")
         return None
     
 # Request crop varieties from LiteFarm API
@@ -261,5 +264,5 @@ async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
             logging.error(f"Error fetching crop varieties: {response.status_code}")
             return None
     except requests.RequestException as e:
-        logging.error(f"Request error: {e}")
+        logging.error(f"Crop varieties request error: {e}")
         return None
