@@ -10,7 +10,7 @@ class TokenRepository(ITokenRepository):
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_by_token(self, token_str: str) -> Optional[Token]:
+    async def get_token_by_token_string(self, token_str: str) -> Optional[Token]:
         result = await self.db.execute(
             select(Token).where(Token.token == token_str)
         )
@@ -27,33 +27,35 @@ class TokenRepository(ITokenRepository):
         )
         return result.scalars().all()
 
-    async def create(self, token: Token) -> Token:
+    async def create_token(self, token: Token) -> Token:
         self.db.add(token)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(token)
         return token
 
-    async def delete_expired(self) -> int:
+    async def deactivate_expired_tokens(self) -> int:
         now = datetime.now(tz=timezone.utc)
         result = await self.db.execute(
             update(Token)
             .where(Token.expires_at <= now)
             .values(is_active=False)
+            .execution_options(synchronize_session=False)
             .returning(Token.id)
         )
         updated_ids = result.scalars().all()
-        await self.db.commit()
+        await self.db.flush()
         return len(updated_ids)
 
-    async def delete_by_token(self, token_str: str) -> bool:
+    async def deactivate_token_by_token_string(self, token_str: str) -> bool:
         result = await self.db.execute(
             update(Token)
             .where(Token.token == token_str)
             .values(is_active=False)
+            .execution_options(synchronize_session=False)
             .returning(Token.id)
         )
         updated_ids = result.scalars().all()
-        await self.db.commit()
+        await self.db.flush()
         return len(updated_ids) > 0
 
     async def update_token_for_chat(self, chat_session_id: int, new_token: Token) -> Token:
@@ -61,8 +63,9 @@ class TokenRepository(ITokenRepository):
             update(Token)
             .where(Token.chat_session_id == chat_session_id)
             .values(is_active=False)
+            .execution_options(synchronize_session=False)
         )
         self.db.add(new_token)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(new_token)
         return new_token

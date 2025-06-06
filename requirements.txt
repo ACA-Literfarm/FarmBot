@@ -6,3 +6,4 @@ requests==2.32.0
 sqlalchemy
 asyncpg
 alembic
+pydantic
