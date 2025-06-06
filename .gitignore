@@ -26,7 +26,7 @@ docker-compose.override.yml
 postgres-data/
 pgdata/
 db-data/
-+.migrations/  # optional: if you store temp migration outputs
+-.migrations/  # optional: if you store temp migration outputs (remove if unused)
 
 # Database backups and dumps
 *.sql
@@ -59,7 +59,9 @@ temp/
 tmp/
 
 # SQLAlchemy / Alembic
-alembic/versions/*.py
+-alembic/versions/*.py
++alembic/versions/*.pyc  # ignore compiled migration files
++alembic/versions/__pycache__/
 !alembic/versions/__init__.py
 +alembic.ini.__bak__  # if someone renames for backup
 +alembic/script.py.mako  # if using templates
@@ -67,17 +69,16 @@ alembic/versions/*.py
 # Coverage and testing
 htmlcov/
 .coverage
+.coverage.*
 .pytest_cache/
 .tox/
 
-# Application specific
+# Application-specific
 uploads/
 media/
 static/files/
 
-# Unit of Work and build/test metadata
-+__snapshots__/  # e.g. snapshot test outputs
+# Build/test artifacts
 +.mypy_cache/
 +.ruff_cache/
-+.pytest_cache/
-+.coverage.*
++__snapshots__/

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Text, TIMESTAMP, ForeignKey, func, Boolean
+from sqlalchemy import Column, Integer, Text, TIMESTAMP, ForeignKey, func, Boolean, Index
 from sqlalchemy.orm import relationship
 from ..base import Base
 
@@ -14,3 +14,9 @@ class Token(Base):
 
     # Relationships
     chat_session = relationship("ChatSession", back_populates="tokens")
+
+    __table_args__ = (
+        Index("idx_tokens_chat_session_id", "chat_session_id"),
+        Index("idx_tokens_token", "token"),
+        Index("idx_tokens_expires_at", "expires_at"),
+    )
