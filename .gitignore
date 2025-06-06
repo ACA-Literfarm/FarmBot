@@ -1,6 +1,83 @@
+# Python environments
 venv/
 env/
+fbenv/
+.venv/
+*.venv
+
+# Environment files
 .env
+.env.local
+.env.development
+.env.production
+.env.test
++.envrc
+
+# Python cache and compiled files
 __pycache__/
 *.pyc
-.env
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Docker related
+docker-compose.override.yml
+.dockerignore
+postgres-data/
+pgdata/
+db-data/
++.migrations/  # optional: if you store temp migration outputs
+
+# Database backups and dumps
+*.sql
+*.dump
+backup/
+backups/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+log/
+docker-logs/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# SQLAlchemy / Alembic
+alembic/versions/*.py
+!alembic/versions/__init__.py
++alembic.ini.__bak__  # if someone renames for backup
++alembic/script.py.mako  # if using templates
+
+# Coverage and testing
+htmlcov/
+.coverage
+.pytest_cache/
+.tox/
+
+# Application specific
+uploads/
+media/
+static/files/
+
+# Unit of Work and build/test metadata
++__snapshots__/  # e.g. snapshot test outputs
++.mypy_cache/
++.ruff_cache/
++.pytest_cache/
++.coverage.*

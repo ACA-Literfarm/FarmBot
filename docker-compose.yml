@@ -1,5 +1,3 @@
-#version: '3.9'
-
 volumes:
   db_data:
 
@@ -11,25 +9,10 @@ services:
       - "5432:5432"
     env_file: .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - ./initdb.d:/docker-entrypoint-initdb.d
       - db_data:/var/lib/postgresql/data
-
-  chatbot:
-    build: ./src
-    env_file: .env
-    depends_on:
-      - db
-
-  web_server:
-    build: ./web_server
-    env_file: .env
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-    volumes:
-      - ./src:/app/src
+    restart: unless-stopped
