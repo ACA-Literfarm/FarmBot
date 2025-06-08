@@ -1,5 +1,4 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
 from shared.DTO.user.user_dto import CreateUserDTO
 from shared.db.models.user import User
 from shared.interfaces.user_interface import IUserRepository
@@ -22,8 +21,9 @@ class UserService:
         return await repo.create_user(user)
 
     async def user_exists(
-        self, litefarm_user_id: UUID, session: AsyncSession
+        self, litefarm_user_id: str, session: AsyncSession
     ) -> bool:
         repo = self._repo_factory(session)
         user = await repo.get_user_by_user_id(litefarm_user_id)
         return user is not None
+    

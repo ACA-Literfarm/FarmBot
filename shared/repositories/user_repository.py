@@ -1,4 +1,3 @@
-from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from ..interfaces.user_interface import IUserRepository
@@ -8,7 +7,7 @@ class UserRepository(IUserRepository):
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_user_by_user_id(self, litefarm_user_id: UUID) -> User | None:
+    async def get_user_by_user_id(self, litefarm_user_id: str) -> User | None:
         result = await self.db.execute(
             select(User).where(User.litefarm_user_id == litefarm_user_id)
         )

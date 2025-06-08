@@ -1,5 +1,4 @@
-from sqlalchemy import Column, Integer, BigInteger, Boolean, TIMESTAMP, ForeignKey, func, Index
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, Integer, BigInteger, Boolean, TIMESTAMP, ForeignKey, func, Index, String
 from sqlalchemy.orm import relationship
 from ..base import Base
 
@@ -8,7 +7,7 @@ class ChatSession(Base):
 
     id = Column(Integer, primary_key=True)
     telegram_chat_id = Column(BigInteger, unique=True, nullable=False)
-    litefarm_user_id = Column(UUID(as_uuid=True), ForeignKey("users.litefarm_user_id", ondelete="CASCADE"))
+    litefarm_user_id = Column(String, ForeignKey("users.litefarm_user_id", ondelete="CASCADE"))
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 

@@ -1,5 +1,4 @@
-from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel 
 
 class CreateUserDTO(BaseModel):
-    litefarm_user_id: UUID
+    litefarm_user_id: str
