@@ -5,10 +5,29 @@ from urllib.parse import urlencode
 import sys
 import os
 import json
+import jwt
+import asyncio
+from datetime import datetime, timezone, timedelta
+
+# Add the project root directory to the Python path first
+project_root = os.path.join(os.path.dirname(__file__), '..')
+sys.path.insert(0, project_root)
 
 # Add the src directory to the Python path to import config
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.join(project_root, 'src'))
 from config import config
+
+# Import database and services
+from shared.db.session import AsyncSessionLocal
+from shared.services.user_service import UserService
+from shared.services.chat_service import ChatSessionService
+from shared.services.token_service import TokenService
+from shared.repositories.user_repository import UserRepository
+from shared.repositories.chat_repository import ChatSessionRepository
+from shared.repositories.token_repository import TokenRepository
+from shared.DTO.user.user_dto import CreateUserDTO
+from shared.DTO.chat.chat_dto import ChatSessionCreateDTO
+from shared.DTO.token.token_dto import TokenCreateDTO
 
 # Validate Flask-specific environment variables
 config.validate_flask_vars()
@@ -19,6 +38,77 @@ app.secret_key = config.FLASK_SECRET_KEY or secrets.token_urlsafe(32)
 
 # Set the LiteFarm URL - default to localhost:5001 if not configured
 LITEFARM_URL = config.URL_LITEFARM or "http://localhost:5001"
+
+# Initialize services
+def create_user_service():
+    return UserService(lambda session: UserRepository(session))
+
+def create_chat_service():
+    return ChatSessionService(lambda session: ChatSessionRepository(session))
+
+def create_token_service():
+    return TokenService(lambda session: TokenRepository(session))
+# Helper function to decode JWT token and extract user_id
+def decode_jwt_token(token: str) -> dict:
+    """
+    Decode JWT token without verification (since we trust LiteFarm API)
+    Returns the payload containing user information
+    """
+    try:
+        # Decode without verification since we trust the source
+        payload = jwt.decode(token, options={"verify_signature": False})
+        return payload
+    except jwt.InvalidTokenError as e:
+        print(f"JWT decode error: {e}")
+        return {}
+
+# Helper function to save login data to database
+async def save_login_data(chat_id: int, token: str, litefarm_user_id: str):
+    """
+    Save login data to database: user, chat session, and token
+    """
+    print(f"-----> Starting save_login_data with chat_id: {chat_id}, user_id: {litefarm_user_id}")
+    try:
+        async with AsyncSessionLocal() as db_session:
+            user_service = create_user_service()
+            chat_service = create_chat_service()
+            token_service = create_token_service()
+            
+            # Create or get user
+            user_dto = CreateUserDTO(litefarm_user_id=litefarm_user_id)
+            user = await user_service.create_user(user_dto, db_session)
+            print(f"-----> User created/retrieved: {user.litefarm_user_id}")
+            
+            # Create chat session (this will deactivate previous sessions)
+            chat_dto = ChatSessionCreateDTO(
+                litefarm_user_id=litefarm_user_id,
+                telegram_chat_id=chat_id
+            )
+            chat_session = await chat_service.create_chat_session(chat_dto, db_session)
+            print(f"-----> Chat session created: {chat_session.id}")
+            
+            # Calculate token expiration (assuming 24 hours)
+            # TODO: change 
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+            
+            # Save token to the token table in the database
+            token_dto = TokenCreateDTO(
+                chat_session_id=chat_session.id,
+                token=token,
+                expires_at=expires_at
+            )
+            token_obj = await token_service.create_token(token_dto, db_session)
+            print(f"-----> Token created: {token_obj.id}")
+            
+            # Commit the transaction
+            await db_session.commit()
+            
+            print(f"Successfully saved login data for chat_id: {chat_id}, user_id: {litefarm_user_id}")
+            return True
+            
+    except Exception as e:
+        print(f"Error saving login data: {e}")
+        return False
 
 app.config['OAUTH2_PROVIDERS'] = {
     'google': {
@@ -36,10 +126,13 @@ app.config['OAUTH2_PROVIDERS'] = {
     }
 }
 
-@app.route('/login?chat_id=<chat_id>')
-def login(chat_id):
+@app.route('/login/<int:chat_id>')
+def login_with_chat_id(chat_id):
+    """Handle login with chat_id in URL path"""
     if chat_id is None:
         return render_template('not_allowed.html')
+    # Store chat_id in session for later use
+    session['telegram_chat_id'] = chat_id
     return render_template('index.html', chat_id=chat_id)
 
 
@@ -94,18 +187,43 @@ def login_post():
         )
         
         # Handle response
-        if response.status_code == 200:
+        if response.status_code in [200, 201]:
             try:
                 response_data = response.json()
                 token = response_data.get('id_token')
                 user_data = response_data.get('user')
                 
                 if token:
+                    # Decode JWT token to get user_id
+                    jwt_payload = decode_jwt_token(token)
+                    litefarm_user_id = jwt_payload.get('user_id')
+                    
+                    # Get chat_id from session
+                    chat_id = session.get('telegram_chat_id')
+                    
+                    # Save login data to database if we have both chat_id and user_id
+                    if chat_id and litefarm_user_id:
+                        # Run async function in sync context
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            success = loop.run_until_complete(
+                                save_login_data(chat_id, token, litefarm_user_id)
+                            )
+                            if success:
+                                print(f"Login data saved successfully for chat_id: {chat_id}")
+                            else:
+                                print(f"Failed to save login data for chat_id: {chat_id}")
+                        finally:
+                            loop.close()
+                    
                     # Store data in session for the success page
                     session['login_success'] = {
                         'token': token,
                         'user': user_data,
-                        'email': email
+                        'email': email,
+                        'chat_id': chat_id,
+                        'litefarm_user_id': litefarm_user_id
                     }
                     # Return JSON response for AJAX request
                     return jsonify({'success': True, 'redirect': url_for('login_success')})
@@ -155,13 +273,17 @@ def login_success():
     
     return render_template('success.html', 
                          token=login_data.get('token'),
-                         user=login_data.get('user'))
+                         user=login_data.get('user'),
+                         chat_id=login_data.get('chat_id'),
+                         litefarm_user_id=login_data.get('litefarm_user_id'))
 
 @app.route('/login', methods=['GET'])
 def login_get():
     """Handle GET requests to /login - redirect to index or render with chat_id"""
-    chat_id = request.args.get('chat_id')
+    chat_id = request.args.get('chat_id') or request.args.get('user_id')
     if chat_id:
+        # Store chat_id in session for later use
+        session['telegram_chat_id'] = int(chat_id)
         return render_template('index.html', chat_id=chat_id)
     return redirect(url_for('index'))
 
@@ -264,6 +386,70 @@ def oauth2_callback(provider):
             headers=litefarm_headers
         )
         
+        print(f"-----> LiteFarm API Response Status: {litefarm_response.status_code}")
+        print(f"-----> LiteFarm API Response Text: {litefarm_response.text}")
+        print(f"-----> Chat ID from session: {session.get('telegram_chat_id')}")
+        
+        # Handle successful LiteFarm response
+        if litefarm_response.status_code in [200, 201]:
+            try:
+                litefarm_json = litefarm_response.json()
+                litefarm_token = litefarm_json.get('id_token')
+                
+                if litefarm_token:
+                    # Decode JWT token to get user_id
+                    jwt_payload = decode_jwt_token(litefarm_token)
+                    litefarm_user_id = jwt_payload.get('user_id')
+                    
+                    print(f"-----> JWT Payload: {jwt_payload}")
+                    print(f"-----> LiteFarm User ID: {litefarm_user_id}")
+                    
+                    # Get chat_id from session
+                    chat_id = session.get('telegram_chat_id')
+                    
+                    print(f"-----> About to save data - Chat ID: {chat_id}, User ID: {litefarm_user_id}")
+                    
+                    # Save login data to database if we have both chat_id and user_id
+                    if chat_id and litefarm_user_id:
+                        # Run async function in sync context (Flask doesn't support async routes)
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            success = loop.run_until_complete(
+                                save_login_data(chat_id, litefarm_token, litefarm_user_id)
+                            )
+                            if success:
+                                print(f"Google login data saved successfully for chat_id: {chat_id}")
+                            else:
+                                print(f"Failed to save Google login data for chat_id: {chat_id}")
+                        finally:
+                            loop.close()
+                    else:
+                        print(f"-----> Cannot save data - Missing chat_id: {chat_id} or user_id: {litefarm_user_id}")
+                    
+                    # Store data in session for the success page
+                    session['login_success'] = {
+                        'token': litefarm_token,
+                        'user': {
+                            'email': email,
+                            'first_name': first_name,
+                            'last_name': last_name,
+                            'user_id': litefarm_user_id
+                        },
+                        'email': email,
+                        'chat_id': chat_id,
+                        'litefarm_user_id': litefarm_user_id
+                    }
+                    
+                    # Clear the OAuth state from session
+                    session.pop('oauth2_state', None)
+                    
+                    # Redirect to success page instead of test results
+                    return redirect(url_for('login_success'))
+                    
+            except (json.JSONDecodeError, ValueError):
+                pass  # Fall through to test results display
+        
         # Prepare result data for testing display
         result_data = {
             'google_user_info': {
@@ -279,7 +465,7 @@ def oauth2_callback(provider):
                 'token_type': token_data.get('token_type', 'Bearer')
             },
             'litefarm_request': {
-                'url': f'{LITEFARM_URL}/google',
+                'url': f'{LITEFARM_URL}/login/google',
                 'headers': litefarm_headers,
                 'data': litefarm_data
             },

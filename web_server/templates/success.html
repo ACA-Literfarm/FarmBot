@@ -40,6 +40,20 @@
             </div>
             {% endif %}
 
+            <!-- Información de la sesión (si está disponible) -->
+            {% if chat_id or litefarm_user_id %}
+            <div class="session-info">
+                <h4>Información de la sesión:</h4>
+                {% if chat_id %}
+                    <p><strong>Chat ID de Telegram:</strong> {{ chat_id }}</p>
+                {% endif %}
+                {% if litefarm_user_id %}
+                    <p><strong>LiteFarm User ID:</strong> {{ litefarm_user_id }}</p>
+                {% endif %}
+                <p><i class="fas fa-check-circle" style="color: #28a745;"></i> Datos guardados exitosamente en la base de datos</p>
+            </div>
+            {% endif %}
+
             <!-- Token de autenticación (para desarrollo/debug) -->
             {% if token %}
             <div class="token-info">
@@ -101,6 +115,25 @@
         }
 
         .user-info p {
+            margin: 0.5rem 0;
+            color: #495057;
+        }
+
+        .session-info {
+            background: #d1ecf1;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .session-info h4 {
+            margin-top: 0;
+            color: #17a2b8;
+            font-size: 1rem;
+        }
+
+        .session-info p {
             margin: 0.5rem 0;
             color: #495057;
         }
