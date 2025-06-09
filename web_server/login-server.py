@@ -1,22 +1,12 @@
-from flask import Flask, redirect, url_for, request, session, abort, flash, render_template, current_app, jsonify
+from flask import Flask, redirect, url_for, request, session, abort, render_template, current_app, jsonify
 import requests
 import secrets
 from urllib.parse import urlencode
 import sys
 import os
 import json
-import jwt
 import asyncio
 from datetime import datetime, timezone, timedelta
-
-# Add the project root directory to the Python path first
-project_root = os.path.join(os.path.dirname(__file__), '..')
-sys.path.insert(0, project_root)
-
-# Add the src directory to the Python path to import config
-sys.path.append(os.path.join(project_root, 'src'))
-from config import config
-
 # Import database and services
 from shared.db.session import AsyncSessionLocal
 from shared.services.user_service import UserService
@@ -28,6 +18,15 @@ from shared.repositories.token_repository import TokenRepository
 from shared.DTO.user.user_dto import CreateUserDTO
 from shared.DTO.chat.chat_dto import ChatSessionCreateDTO
 from shared.DTO.token.token_dto import TokenCreateDTO
+from shared.utils.jwt_utils import decode_jwt_token
+
+# Add the project root directory to the Python path first
+project_root = os.path.join(os.path.dirname(__file__), '..')
+sys.path.insert(0, project_root)
+
+# Add the src directory to the Python path to import config
+sys.path.append(os.path.join(project_root, 'src'))
+from config import config
 
 # Validate Flask-specific environment variables
 config.validate_flask_vars()
@@ -36,9 +35,24 @@ app = Flask(__name__)
 # Set a secret key for session management
 app.secret_key = config.FLASK_SECRET_KEY or secrets.token_urlsafe(32)
 
-# Set the LiteFarm URL - default to localhost:5001 if not configured
-LITEFARM_URL = config.URL_LITEFARM or "http://localhost:5001"
+# Set the LiteFarm URL
+LITEFARM_URL = config.URL_LITEFARM
 
+app.config['OAUTH2_PROVIDERS'] = {
+    'google': {
+        'client_id': config.GOOGLE_CLIENT_ID,
+        'client_secret': config.GOOGLE_CLIENT_SECRET,
+        'authorize_url': 'https://accounts.google.com/o/oauth2/auth',
+        'token_url': 'https://accounts.google.com/o/oauth2/token',
+        'userinfo': {
+            'url': 'https://www.googleapis.com/oauth2/v3/userinfo',
+            'email': lambda json: json.get('email'),
+            'first_name': lambda json: json.get('given_name'),
+            'last_name': lambda json: json.get('family_name'),
+        },
+        'scope': ['https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile']
+    }
+}
 # Initialize services
 def create_user_service():
     return UserService(lambda session: UserRepository(session))
@@ -48,19 +62,6 @@ def create_chat_service():
 
 def create_token_service():
     return TokenService(lambda session: TokenRepository(session))
-# Helper function to decode JWT token and extract user_id
-def decode_jwt_token(token: str) -> dict:
-    """
-    Decode JWT token without verification (since we trust LiteFarm API)
-    Returns the payload containing user information
-    """
-    try:
-        # Decode without verification since we trust the source
-        payload = jwt.decode(token, options={"verify_signature": False})
-        return payload
-    except jwt.InvalidTokenError as e:
-        print(f"JWT decode error: {e}")
-        return {}
 
 # Helper function to save login data to database
 async def save_login_data(chat_id: int, token: str, litefarm_user_id: str):
@@ -80,6 +81,7 @@ async def save_login_data(chat_id: int, token: str, litefarm_user_id: str):
             print(f"-----> User created/retrieved: {user.litefarm_user_id}")
             
             # Create chat session (this will deactivate previous sessions)
+            # TODO: Think about multiple users per chat
             chat_dto = ChatSessionCreateDTO(
                 litefarm_user_id=litefarm_user_id,
                 telegram_chat_id=chat_id
@@ -88,7 +90,7 @@ async def save_login_data(chat_id: int, token: str, litefarm_user_id: str):
             print(f"-----> Chat session created: {chat_session.id}")
             
             # Calculate token expiration (assuming 24 hours)
-            # TODO: change 
+            # TODO: change to specified hours in the future
             expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
             
             # Save token to the token table in the database
@@ -110,22 +112,6 @@ async def save_login_data(chat_id: int, token: str, litefarm_user_id: str):
         print(f"Error saving login data: {e}")
         return False
 
-app.config['OAUTH2_PROVIDERS'] = {
-    'google': {
-        'client_id': config.GOOGLE_CLIENT_ID,
-        'client_secret': config.GOOGLE_CLIENT_SECRET,
-        'authorize_url': 'https://accounts.google.com/o/oauth2/auth',
-        'token_url': 'https://accounts.google.com/o/oauth2/token',
-        'userinfo': {
-            'url': 'https://www.googleapis.com/oauth2/v3/userinfo',
-            'email': lambda json: json.get('email'),
-            'first_name': lambda json: json.get('given_name'),
-            'last_name': lambda json: json.get('family_name'),
-        },
-        'scope': ['https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile']
-    }
-}
-
 @app.route('/login/<int:chat_id>')
 def login_with_chat_id(chat_id):
     """Handle login with chat_id in URL path"""
@@ -134,7 +120,6 @@ def login_with_chat_id(chat_id):
     # Store chat_id in session for later use
     session['telegram_chat_id'] = chat_id
     return render_template('index.html', chat_id=chat_id)
-
 
 ## post request to /login
 @app.route('/')
