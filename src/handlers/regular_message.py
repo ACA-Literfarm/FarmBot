@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime, date
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.enums import ChatAction
 from services.ai_service import query_ai_model
 from services.api_service import handle_api_transaction, request_expense_types, request_revenue_types, request_crop_varieties
@@ -150,15 +150,16 @@ async def handle_regular_message(message: Message):
         else:
             # Todos los campos están completos
             api_response = state["api_response"]
+            clasificacion = state.get("clasificacion", "")
+            respuesta = state["respuesta"]
             del user_states[user_id]
             
             # Apply default customer if empty for revenue
             if api_response.get("customer") == "":
                 api_response["customer"] = "Cliente General"
             
-            async with show_typing(message):
-                await handle_api_transaction(api_response)
-            await message.answer(state["respuesta"])
+            # Show confirmation message instead of directly processing
+            await show_confirmation_message(message, respuesta, api_response, clasificacion)
             return
 
     # Si no hay estado previo, procesar el mensaje normalmente
@@ -233,7 +234,7 @@ async def handle_regular_message(message: Message):
                 transaction_date = format_date_for_display(api_response.get("date", ""))
                 formatted_value = format_currency_value(value)
 
-                respuesta = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
+                respuesta = f"Seleccioné este tipo: {selected_name}\n\nVoy a registrar {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} 🚜💸."
             else:
                 respuesta = "No pude identificar un tipo de gasto específico. Por favor, asegúrate de que el mensaje incluya un tipo de gasto válido.\n\n" + respuesta
 
@@ -271,7 +272,7 @@ async def handle_regular_message(message: Message):
             formatted_value = format_currency_value(value)
             
             # Create success response with customer info
-            respuesta = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
+            respuesta = f"Seleccioné este tipo: {revenue_name}\n\nVoy a registrar {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} 🚜💰."
 
         # Handle non-related classification
         elif clasificacion == "no_relacionado":
@@ -295,6 +296,7 @@ async def handle_regular_message(message: Message):
                 "missing_fields": missing_fields,
                 "api_response": api_response,
                 "respuesta": respuesta,
+                "clasificacion": clasificacion,
             }
             first_missing_field = missing_fields[0]
             if first_missing_field == "value":
@@ -309,11 +311,8 @@ async def handle_regular_message(message: Message):
         if clasificacion == "ingreso" and not api_response.get("customer"):
             api_response["customer"] = "Cliente General"
 
-        # Process final transaction
-        async with show_typing(message):
-            await handle_api_transaction(api_response, clasificacion)
-        
-        await message.answer(respuesta)
+        # Show confirmation message instead of directly processing
+        await show_confirmation_message(message, respuesta, api_response, clasificacion)
 
     except json.JSONDecodeError:
         logging.warning("Respuesta del modelo no tiene formato JSON válido. Respuesta recibida: %s", response_text)
@@ -321,3 +320,29 @@ async def handle_regular_message(message: Message):
             "❌ Lo siento, no entendí tu mensaje o hubo un error procesando la respuesta. "
             "Por favor, intenta reformular tu mensaje o usa /help para ver ejemplos de uso."
         )
+
+async def show_confirmation_message(message: Message, transaction_details: str, api_response: dict, clasificacion: str):
+    """
+    Show confirmation message with inline keyboard buttons.
+    """
+    user_id = message.from_user.id
+    
+    # Store transaction data for confirmation
+    user_states[user_id] = {
+        "awaiting_confirmation": True,
+        "api_response": api_response,
+        "clasificacion": clasificacion,
+        "transaction_details": transaction_details
+    }
+    
+    # Create inline keyboard with confirmation buttons
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Confirmar", callback_data=f"confirm_{user_id}"),
+            InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_{user_id}")
+        ]
+    ])
+    
+    confirmation_text = f"{transaction_details}\n\n¿Estás seguro de realizar la acción?"
+    
+    await message.answer(confirmation_text, reply_markup=keyboard)
