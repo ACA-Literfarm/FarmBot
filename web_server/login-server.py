@@ -7,7 +7,16 @@ import os
 import json
 import asyncio
 from datetime import datetime, timezone, timedelta
-# Import database and services
+
+# Add the project root directory to the Python path first
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+# Add the src directory to the Python path to import config
+sys.path.insert(0, os.path.join(project_root, 'src'))
+from config import config
+
+# Import database and services after path setup
 from shared.db.session import AsyncSessionLocal
 from shared.services.user_service import UserService
 from shared.services.chat_service import ChatSessionService
@@ -19,14 +28,6 @@ from shared.DTO.user.user_dto import CreateUserDTO
 from shared.DTO.chat.chat_dto import ChatSessionCreateDTO
 from shared.DTO.token.token_dto import TokenCreateDTO
 from shared.utils.jwt_utils import decode_jwt_token
-
-# Add the project root directory to the Python path first
-project_root = os.path.join(os.path.dirname(__file__), '..')
-sys.path.insert(0, project_root)
-
-# Add the src directory to the Python path to import config
-sys.path.append(os.path.join(project_root, 'src'))
-from config import config
 
 # Validate Flask-specific environment variables
 config.validate_flask_vars()

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
+
 <body>
     <div class="container">
         <div class="login-card">
@@ -29,13 +31,13 @@
             <div class="user-info">
                 <h3>Bienvenido</h3>
                 {% if user.first_name and user.last_name %}
-                    <p><strong>Nombre:</strong> {{ user.first_name }} {{ user.last_name }}</p>
+                <p><strong>Nombre:</strong> {{ user.first_name }} {{ user.last_name }}</p>
                 {% endif %}
                 {% if user.email %}
-                    <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>Email:</strong> {{ user.email }}</p>
                 {% endif %}
                 {% if user.user_id %}
-                    <p><strong>ID de usuario:</strong> {{ user.user_id }}</p>
+                <p><strong>ID de usuario:</strong> {{ user.user_id }}</p>
                 {% endif %}
             </div>
             {% endif %}
@@ -45,25 +47,13 @@
             <div class="session-info">
                 <h4>Información de la sesión:</h4>
                 {% if chat_id %}
-                    <p><strong>Chat ID de Telegram:</strong> {{ chat_id }}</p>
+                <p><strong>Chat ID de Telegram:</strong> {{ chat_id }}</p>
                 {% endif %}
                 {% if litefarm_user_id %}
-                    <p><strong>LiteFarm User ID:</strong> {{ litefarm_user_id }}</p>
+                <p><strong>LiteFarm User ID:</strong> {{ litefarm_user_id }}</p>
                 {% endif %}
-                <p><i class="fas fa-check-circle" style="color: #28a745;"></i> Datos guardados exitosamente en la base de datos</p>
-            </div>
-            {% endif %}
-
-            <!-- Token de autenticación (para desarrollo/debug) -->
-            {% if token %}
-            <div class="token-info">
-                <h4>Token de autenticación:</h4>
-                <div class="token-display">
-                    <code id="auth-token">{{ token }}</code>
-                    <button type="button" class="copy-btn" onclick="copyToken()">
-                        <i class="fas fa-copy"></i> Copiar
-                    </button>
-                </div>
+                <p><i class="fas fa-check-circle" style="color: #28a745;"></i> Datos guardados exitosamente en la base
+                    de datos</p>
             </div>
             {% endif %}
 
@@ -243,7 +233,7 @@
                 const originalText = btn.innerHTML;
                 btn.innerHTML = '<i class="fas fa-check"></i> Copiado';
                 btn.style.background = '#28a745';
-                
+
                 setTimeout(() => {
                     btn.innerHTML = originalText;
                     btn.style.background = '#007bff';
@@ -262,4 +252,5 @@
         }
     </script>
 </body>
-</html> 
+
+</html>
