@@ -1,11 +1,10 @@
 # shared/DTO/chat/chat_return_dto.py
 from pydantic import BaseModel
 from datetime import datetime
-from uuid import UUID
 
 class ChatSessionOutDTO(BaseModel):
     id: int
-    litefarm_user_id: UUID
+    litefarm_user_id: str
     telegram_chat_id: int
     is_active: bool
     created_at: datetime

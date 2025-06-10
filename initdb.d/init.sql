@@ -1,8 +1,7 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- USERS (LiteFarm users who can chat from multiple Telegram accounts)
 CREATE TABLE users (
-    litefarm_user_id UUID PRIMARY KEY,
+    litefarm_user_id VARCHAR(255) PRIMARY KEY,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -10,7 +9,7 @@ CREATE TABLE users (
 CREATE TABLE chat_sessions (
     id SERIAL PRIMARY KEY,
     telegram_chat_id BIGINT NOT NULL UNIQUE, -- Each Telegram chat is unique
-    litefarm_user_id UUID REFERENCES users(litefarm_user_id) ON DELETE CASCADE,
+    litefarm_user_id VARCHAR(255) REFERENCES users(litefarm_user_id) ON DELETE CASCADE,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );

@@ -7,3 +7,4 @@ sqlalchemy
 asyncpg
 alembic
 pydantic
+PyJWT==2.8.0
