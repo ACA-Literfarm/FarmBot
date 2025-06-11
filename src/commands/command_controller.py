@@ -7,6 +7,8 @@ from commands.start import cmd_start
 from commands.help import cmd_help
 from commands.login import cmd_login
 from commands.cancel import cmd_cancel
+from commands.disable_validation import cmd_deshabilitar_validacion
+from commands.enable_validation import cmd_habilitar_validacion
 
 def register_handlers(dp: Dispatcher):
     """Register all message handlers with the dispatcher"""
@@ -26,6 +28,14 @@ def register_handlers(dp: Dispatcher):
     @dp.message(Command("cancel"))
     async def cancel_handler(message: Message):
         await cmd_cancel(message)
+    
+    @dp.message(Command("deshabilitar_validacion"))
+    async def deshabilitar_validacion_handler(message: Message):
+        await cmd_deshabilitar_validacion(message)
+    
+    @dp.message(Command("habilitar_validacion"))
+    async def habilitar_validacion_handler(message: Message):
+        await cmd_habilitar_validacion(message)
     
     @dp.callback_query(lambda c: c.data and (c.data.startswith("confirm_") or c.data.startswith("cancel_")))
     async def confirmation_callback_handler(callback: CallbackQuery):

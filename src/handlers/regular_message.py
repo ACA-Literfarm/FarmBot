@@ -6,6 +6,7 @@ from aiogram.enums import ChatAction
 from services.ai_service import query_ai_model
 from services.api_service import handle_api_transaction, request_expense_types, request_revenue_types, request_crop_varieties
 from services.typing_context import show_typing
+from commands.disable_validation import get_validation_enabled
 
 # Diccionario para rastrear el estado del usuario
 user_states = {}
@@ -163,8 +164,16 @@ async def handle_regular_message(message: Message):
             if api_response.get("customer") == "":
                 api_response["customer"] = "Cliente General"
             
-            # Show confirmation message instead of directly processing
-            await show_confirmation_message(message, respuesta, api_response, clasificacion)
+            # Check if validation is enabled for this user
+            user_id = message.from_user.id
+            validation_enabled = get_validation_enabled(user_id)
+            
+            if validation_enabled:
+                # Show confirmation message if validation is enabled
+                await show_confirmation_message(message, respuesta, api_response, clasificacion)
+            else:
+                # Process transaction directly if validation is disabled
+                await process_transaction_directly(message, respuesta, api_response, clasificacion)
             return
 
     # Si no hay estado previo, procesar el mensaje normalmente
@@ -331,14 +340,44 @@ async def handle_regular_message(message: Message):
         if clasificacion == "ingreso" and not api_response.get("customer"):
             api_response["customer"] = "Cliente General"
 
-        # Show confirmation message instead of directly processing
-        await show_confirmation_message(message, respuesta, api_response, clasificacion)
+        # Check if validation is enabled for this user
+        user_id = message.from_user.id
+        validation_enabled = get_validation_enabled(user_id)
+        
+        if validation_enabled:
+            # Show confirmation message if validation is enabled
+            await show_confirmation_message(message, respuesta, api_response, clasificacion)
+        else:
+            # Process transaction directly if validation is disabled
+            await process_transaction_directly(message, respuesta, api_response, clasificacion)
 
     except json.JSONDecodeError:
         logging.warning("Respuesta del modelo no tiene formato JSON válido. Respuesta recibida: %s", response_text)
         await message.answer(
             "❌ Lo siento, no entendí tu mensaje o hubo un error procesando la respuesta. "
             "Por favor, intenta reformular tu mensaje o usa /help para ver ejemplos de uso."
+        )
+
+async def process_transaction_directly(message: Message, transaction_details: str, api_response: dict, clasificacion: str):
+    """
+    Process transaction directly without confirmation when validation is disabled.
+    """
+    try:
+        # Show typing while processing transaction
+        async with show_typing(message):
+            await handle_api_transaction(api_response, clasificacion)
+        
+        # Create success message
+        success_message = transaction_details.replace("Voy a registrar", "¡Listo! He registrado")
+        success_message += "\n\n✅ Transacción registrada exitosamente. Si tienes más gastos o ingresos para registrar, avísame."
+        success_message += "\n\n💡 *Validación deshabilitada* - Para habilitar confirmación usa /habilitar_validacion"
+        
+        await message.answer(success_message)
+        
+    except Exception as e:
+        logging.error(f"Error processing transaction directly: {e}")
+        await message.answer(
+            "❌ Error al procesar la transacción. Por favor, intenta nuevamente."
         )
 
 async def show_confirmation_message(message: Message, transaction_details: str, api_response: dict, clasificacion: str):
