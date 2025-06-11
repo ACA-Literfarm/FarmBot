@@ -139,13 +139,18 @@ async def handle_regular_message(message: Message):
 
         # Si aún faltan campos, solicitar el siguiente
         if state["missing_fields"]:
+            # Create inline keyboard with cancel button
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
+            ])
+            
             next_field = state["missing_fields"][0]
             if next_field == "value":
-                await message.answer("💰 Por favor, ingresa el precio de la transacción:")
+                await message.answer("💰 Por favor, ingresa el precio de la transacción:", reply_markup=keyboard)
             elif next_field == "note":
-                await message.answer("📝 Por favor, proporciona una breve descripción de la transacción:")
+                await message.answer("📝 Por favor, proporciona una breve descripción de la transacción:", reply_markup=keyboard)
             elif next_field == "type":
-                await message.answer("📂 Por favor, indica el tipo de transacción (por ejemplo: gasolina, maquinaria, plantas, otro):")
+                await message.answer("📂 Por favor, indica el tipo de transacción (por ejemplo: gasolina, maquinaria, plantas, otro):", reply_markup=keyboard)
             return
         else:
             # Todos los campos están completos
@@ -298,13 +303,28 @@ async def handle_regular_message(message: Message):
                 "respuesta": respuesta,
                 "clasificacion": clasificacion,
             }
+            
+            # Create inline keyboard with cancel button
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
+            ])
+            
             first_missing_field = missing_fields[0]
             if first_missing_field == "value":
-                await message.answer("💰 Faltó el precio de la transacción. Por favor, ingrésalo:")
+                await message.answer(
+                    "💰 Faltó el precio de la transacción. Por favor, ingrésalo:",
+                    reply_markup=keyboard
+                )
             elif first_missing_field == "note":
-                await message.answer("📝 Faltó la descripción de la transacción. Por favor, proporciónala:")
+                await message.answer(
+                    "📝 Faltó la descripción de la transacción. Por favor, proporciónala:",
+                    reply_markup=keyboard
+                )
             elif first_missing_field == "type":
-                await message.answer("📂 Faltó el tipo de transacción. Por favor, indícalo (por ejemplo: gasolina, maquinaria, plantas, otro):")
+                await message.answer(
+                    "📂 Faltó el tipo de transacción. Por favor, indícalo (por ejemplo: gasolina, maquinaria, plantas, otro):",
+                    reply_markup=keyboard
+                )
             return
 
         # Apply default customer if empty for revenue
