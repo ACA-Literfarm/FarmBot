@@ -6,6 +6,7 @@ from aiogram.enums import ChatAction
 from services.ai_service import query_ai_model
 from services.api_service import handle_api_transaction, request_expense_types, request_revenue_types, request_crop_varieties
 from services.typing_context import show_typing
+from services.farm_service import farm_service
 
 # Diccionario para rastrear el estado del usuario
 user_states = {}
@@ -131,6 +132,17 @@ async def handle_regular_message(message: Message):
     user_id = message.from_user.id  # Identificar al usuario por su ID
     user_input = message.text.strip()
 
+    # CHECK FARM SELECTION FIRST - Add this validation at the beginning
+    selected_farm = farm_service.get_selected_farm(str(user_id))
+    if not selected_farm:
+        await message.answer(
+            "❌ **Necesitas seleccionar una granja primero**\n\n"
+            "Usa /selectfarm para elegir la granja con la que quieres trabajar. "
+            "Todas las transacciones deben estar asociadas a una granja específica. 🏡",
+            parse_mode='Markdown'
+        )
+        return
+
     # Verificar si el usuario está completando un campo faltante
     if user_id in user_states:
         state = user_states[user_id]
@@ -150,6 +162,10 @@ async def handle_regular_message(message: Message):
         else:
             # Todos los campos están completos
             api_response = state["api_response"]
+            
+            # ADD FARM ID TO API RESPONSE - Add this line
+            api_response["farm_id"] = selected_farm["farm_id"]
+            
             del user_states[user_id]
             
             # Apply default customer if empty for revenue
@@ -198,6 +214,9 @@ async def handle_regular_message(message: Message):
             "note": "", "value": "", "type": "", "date": "", "crop_variety": "", "customer": ""
         })
 
+        # ADD FARM ID TO API RESPONSE - Add this line right after getting api_response
+        api_response["farm_id"] = selected_farm["farm_id"]
+
         # When an expense is detected, show available expense types
         # What it does: Based on the list of expense types, it formats them for user display.
         # This will also show the selected expense type if it exists in the response.
@@ -233,7 +252,8 @@ async def handle_regular_message(message: Message):
                 transaction_date = format_date_for_display(api_response.get("date", ""))
                 formatted_value = format_currency_value(value)
 
-                respuesta = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
+                # INCLUDE FARM NAME IN RESPONSE MESSAGE - Update response to include farm info
+                respuesta = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} en la granja **{selected_farm['farm_name']}** 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
             else:
                 respuesta = "No pude identificar un tipo de gasto específico. Por favor, asegúrate de que el mensaje incluya un tipo de gasto válido.\n\n" + respuesta
 
@@ -270,8 +290,8 @@ async def handle_regular_message(message: Message):
             transaction_date = format_date_for_display(api_response.get("date", ""))
             formatted_value = format_currency_value(value)
             
-            # Create success response with customer info
-            respuesta = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
+            # INCLUDE FARM NAME IN RESPONSE MESSAGE - Update response to include farm info
+            respuesta = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} en la granja **{selected_farm['farm_name']}** 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
 
         # Handle non-related classification
         elif clasificacion == "no_relacionado":
@@ -293,7 +313,7 @@ async def handle_regular_message(message: Message):
             # Guardar el estado del usuario
             user_states[user_id] = {
                 "missing_fields": missing_fields,
-                "api_response": api_response,
+                "api_response": api_response,  # This already includes farm_id
                 "respuesta": respuesta,
             }
             first_missing_field = missing_fields[0]
@@ -309,11 +329,11 @@ async def handle_regular_message(message: Message):
         if clasificacion == "ingreso" and not api_response.get("customer"):
             api_response["customer"] = "Cliente General"
 
-        # Process final transaction
+        # Process final transaction (api_response already includes farm_id)
         async with show_typing(message):
             await handle_api_transaction(api_response)
         
-        await message.answer(respuesta)
+        await message.answer(respuesta, parse_mode='Markdown')
 
     except json.JSONDecodeError:
         logging.warning("Respuesta del modelo no tiene formato JSON válido. Respuesta recibida: %s", response_text)
