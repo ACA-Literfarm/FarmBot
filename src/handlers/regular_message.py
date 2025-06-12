@@ -331,7 +331,7 @@ async def handle_regular_message(message: Message):
 
         # Process final transaction (api_response already includes farm_id)
         async with show_typing(message):
-            await handle_api_transaction(api_response)
+            await handle_api_transaction(api_response, clasificacion)
         
         await message.answer(respuesta, parse_mode='Markdown')
 

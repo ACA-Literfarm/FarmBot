@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Test Results - LiteFarm Integration</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .section h2 {
+            margin: 0 0 15px 0;
+            color: #333;
+            border-bottom: 2px solid #4facfe;
+            padding-bottom: 5px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #555;
+        }
+        .info-value {
+            color: #333;
+            word-break: break-all;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.8em;
+        }
+        .status-success {
+            background: #4caf50;
+            color: white;
+        }
+        .status-error {
+            background: #f44336;
+            color: white;
+        }
+        .status-warning {
+            background: #ff9800;
+            color: white;
+        }
+        .json-container {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .back-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #4facfe;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+        .back-button:hover {
+            background: #3d8bfe;
+        }
+        .copy-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        .copy-button:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 OAuth Test Results</h1>
+            <p>Google OAuth + LiteFarm API Integration Test</p>
+        </div>
+        
+        <div class="content">
+            <!-- Google User Information -->
+            <div class="section">
+                <h2>👤 Google User Information</h2>
+                <div class="info-grid">
+                    <div class="info-label">User ID:</div>
+                    <div class="info-value">{{ result.google_user_info.user_id }}</div>
+                    
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">{{ result.google_user_info.email }}</div>
+                    
+                    <div class="info-label">First Name:</div>
+                    <div class="info-value">{{ result.google_user_info.first_name }}</div>
+                    
+                    <div class="info-label">Last Name:</div>
+                    <div class="info-value">{{ result.google_user_info.last_name }}</div>
+                    
+                    <div class="info-label">Full Name:</div>
+                    <div class="info-value">{{ result.google_user_info.full_name }}</div>
+                </div>
+            </div>
+
+            <!-- Google Tokens -->
+            <div class="section">
+                <h2>🔑 Google OAuth Tokens</h2>
+                <div class="info-grid">
+                    <div class="info-label">Token Type:</div>
+                    <div class="info-value">{{ result.google_tokens.token_type }}</div>
+                    
+                    <div class="info-label">Access Token:</div>
+                    <div class="info-value">
+                        {{ result.google_tokens.access_token[:50] }}...
+                        <button class="copy-button" onclick="copyToClipboard('{{ result.google_tokens.access_token }}')">Copy Full</button>
+                    </div>
+                    
+                    {% if result.google_tokens.id_token %}
+                    <div class="info-label">ID Token (JWT):</div>
+                    <div class="info-value">
+                        {{ result.google_tokens.id_token[:50] }}...
+                        <button class="copy-button" onclick="copyToClipboard('{{ result.google_tokens.id_token }}')">Copy Full</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- LiteFarm Request -->
+            <div class="section">
+                <h2>📤 LiteFarm API Request</h2>
+                <div class="info-grid">
+                    <div class="info-label">URL:</div>
+                    <div class="info-value">{{ result.litefarm_request.url }}</div>
+                    
+                    <div class="info-label">Method:</div>
+                    <div class="info-value">POST</div>
+                </div>
+                
+                <h3>Headers:</h3>
+                <div class="json-container">{{ result.litefarm_request.headers | tojson(indent=2) }}</div>
+                
+                <h3>Request Data:</h3>
+                <div class="json-container">{{ result.litefarm_request.data | tojson(indent=2) }}</div>
+            </div>
+
+            <!-- LiteFarm Response -->
+            <div class="section">
+                <h2>📥 LiteFarm API Response</h2>
+                <div class="info-grid">
+                    <div class="info-label">Status Code:</div>
+                    <div class="info-value">
+                        <span class="status-badge {% if result.litefarm_response.status_code == 200 or result.litefarm_response.status_code == 201 %}status-success{% elif result.litefarm_response.status_code >= 400 %}status-error{% else %}status-warning{% endif %}">
+                            {{ result.litefarm_response.status_code }}
+                        </span>
+                    </div>
+                </div>
+                
+                <h3>Response Headers:</h3>
+                <div class="json-container">{{ result.litefarm_response.headers | tojson(indent=2) }}</div>
+                
+                {% if result.litefarm_response.json %}
+                <h3>Response JSON:</h3>
+                <div class="json-container">{{ result.litefarm_response.json | tojson(indent=2) }}</div>
+                {% else %}
+                <h3>Response Text:</h3>
+                <div class="json-container">{{ result.litefarm_response.response_text }}</div>
+                {% endif %}
+            </div>
+
+            <!-- Summary -->
+            <div class="section">
+                <h2>📊 Test Summary</h2>
+                <div class="info-grid">
+                    <div class="info-label">Google OAuth:</div>
+                    <div class="info-value"><span class="status-badge status-success">Success</span></div>
+                    
+                    <div class="info-label">User Info Retrieval:</div>
+                    <div class="info-value"><span class="status-badge status-success">Success</span></div>
+                    
+                    <div class="info-label">LiteFarm API Call:</div>
+                    <div class="info-value">
+                        <span class="status-badge {% if result.litefarm_response.status_code == 200 or result.litefarm_response.status_code == 201 %}status-success{% elif result.litefarm_response.status_code >= 400 %}status-error{% else %}status-warning{% endif %}">
+                            {% if result.litefarm_response.status_code == 200 or result.litefarm_response.status_code == 201 %}
+                                Success
+                            {% elif result.litefarm_response.status_code >= 400 %}
+                                Failed
+                            {% else %}
+                                Warning
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <a href="/" class="back-button">← Back to Login</a>
+        </div>
+    </div>
+
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                alert('Copied to clipboard!');
+            }, function(err) {
+                console.error('Could not copy text: ', err);
+                // Fallback method
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('Copied to clipboard!');
+                } catch (err) {
+                    alert('Could not copy to clipboard');
+                }
+                document.body.removeChild(textArea);
+            });
+        }
+    </script>
+</body>
+</html> 

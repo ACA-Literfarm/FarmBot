@@ -3,8 +3,9 @@ import json
 import requests
 from typing import Dict, Any, Optional, List
 from config import config
+from datetime import datetime
 
-async def handle_api_transaction(api_response: dict):
+async def handle_api_transaction(api_response: dict, clasificacion: str) -> None:
     """
     Handle API transaction with customer support.
     """
@@ -147,7 +148,7 @@ async def request_expense_types() -> Optional[List[Dict[str, Any]]]:
             logging.error(f"Error fetching expense types: {response.status_code}")
             return None
     except requests.RequestException as e:
-        logging.error(f"Request error: {e}")
+        logging.error(f"Expense request error: {e}")
         return None
 
 # Request revenue types from LiteFarm API
@@ -159,39 +160,12 @@ async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
         List of revenue types if successful, None if there was an error
     """
 
-    # Return static JSON data for testing/development
-    static_revenue_types = [
-        {
-            "revenue_type_id": 1,
-            "revenue_name": "Crop Sale",
-            "farm_id": None,
-            "deleted": False,
-            "revenue_translation_key": "CROP_SALE",
-            "agriculture_associated": None,
-            "crop_generated": True,
-            "custom_description": None,
-            "retired": False
-        },
-        {
-            "revenue_type_id": 405,
-            "revenue_name": "Otros",
-            "farm_id": "bb8be50e-1261-11f0-8528-0242ac150003",
-            "deleted": False,
-            "revenue_translation_key": "OTROS",
-            "agriculture_associated": None,
-            "crop_generated": False,
-            "custom_description": "Otros tipos de ingresos",
-            "retired": False
-        }
-    ]
-    return static_revenue_types
     if not config.URL_LITEFARM:
         logging.error("URL_LITEFARM environment variable not set")
         return None
         
     try:
-        # TODO: Implement farm_id retrieval logic
-        farm_id = "5aa78ca8-3236-11f0-a33e-66ab45519382"  # Replace with actual farm ID retrieval logic
+        farm_id = config.FARM_ID
 
         """ 
         Header format must look like this:
@@ -203,8 +177,7 @@ async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
         The farm_id is used to fetch revenue types specific to a farm.
         """
 
-        # TODO: Implement logic to retrieve the login token dynamically
-        token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNzcxMDE1YWMtMzIyZS0xMWYwLTk0YjQtNjZhYjQ1NTE5MzgyIiwiaWF0IjoxNzQ4MjUxMzMzLCJleHAiOjE3NDg4NTYxMzN9.-75_9cXDDuyIsimehvhPoo_xc5yU1mI3RQ5fkXct15U"
+        token=config.LOGIN_TOKEN
         
         headers = {
             "Content-Type": "application/json",
@@ -236,7 +209,7 @@ async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
             logging.error(f"Error fetching revenue types: {response.status_code}")
             return None
     except requests.RequestException as e:
-        logging.error(f"Request error: {e}")
+        logging.error(f"Revenue request error: {e}")
         return None
     
 # Request crop varieties from LiteFarm API
@@ -247,95 +220,6 @@ async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
     Returns:
         List of crop varieties if successful, None if there was an error
     """
-    # Return static JSON data for testing/development
-    static_crop_varieties = [
-        {
-            "crop_variety_id": "d90979d4-373c-11f0-82ec-be0a3bb4732c",
-            "crop_id": 310,
-            "crop_variety_name": "Acacia amarilla",
-            "farm_id": "5aa78ca8-3236-11f0-a33e-66ab45519382",
-            "supplier": "",
-            "lifecycle": "PERENNIAL",
-            "compliance_file_url": "",
-            "organic": None,
-            "genetically_engineered": None,
-            "searched": None,
-            "crop_variety_photo_url": "https://litefarm.nyc3.cdn.digitaloceanspaces.com/default_crop/v2/default.webp",
-            "treated": None,
-            "hs_code_id": "4403",
-            "crop_varietal": "",
-            "crop_cultivar": ""
-        },
-        {
-            "crop_variety_id": "e12345a1-374a-11f0-82ec-be0a3bb4732c",
-            "crop_id": 312,
-            "crop_variety_name": "Tomate",
-            "farm_id": "5aa78ca8-3236-11f0-a33e-66ab45519382",
-            "supplier": "",
-            "lifecycle": "ANNUAL",
-            "compliance_file_url": "",
-            "organic": True,
-            "genetically_engineered": False,
-            "searched": None,
-            "crop_variety_photo_url": "https://litefarm.nyc3.cdn.digitaloceanspaces.com/default_crop/v2/default.webp",
-            "treated": False,
-            "hs_code_id": "0702",
-            "crop_varietal": "",
-            "crop_cultivar": ""
-        },
-        {
-            "crop_variety_id": "e12345a2-374a-11f0-82ec-be0a3bb4732c",
-            "crop_id": 315,
-            "crop_variety_name": "Maíz",
-            "farm_id": "5aa78ca8-3236-11f0-a33e-66ab45519382",
-            "supplier": "",
-            "lifecycle": "ANNUAL",
-            "compliance_file_url": "",
-            "organic": False,
-            "genetically_engineered": True,
-            "searched": None,
-            "crop_variety_photo_url": "https://litefarm.nyc3.cdn.digitaloceanspaces.com/default_crop/v2/default.webp",
-            "treated": True,
-            "hs_code_id": "1005",
-            "crop_varietal": "Híbrido triple",
-            "crop_cultivar": "Golden Sweet"
-        },
-        {
-            "crop_variety_id": "e12345a3-374a-11f0-82ec-be0a3bb4732c",
-            "crop_id": 318,
-            "crop_variety_name": "Lechuga",
-            "farm_id": "5aa78ca8-3236-11f0-a33e-66ab45519382",
-            "supplier": "",
-            "lifecycle": "ANNUAL",
-            "compliance_file_url": "",
-            "organic": True,
-            "genetically_engineered": False,
-            "searched": None,
-            "crop_variety_photo_url": "https://litefarm.nyc3.cdn.digitaloceanspaces.com/default_crop/v2/default.webp",
-            "treated": False,
-            "hs_code_id": "0705",
-            "crop_varietal": "",
-            "crop_cultivar": "Butterhead"
-        },
-        {
-            "crop_variety_id": "e12345a4-374a-11f0-82ec-be0a3bb4732c",
-            "crop_id": 320,
-            "crop_variety_name": "Cafe",
-            "farm_id": "5aa78ca8-3236-11f0-a33e-66ab45519382",
-            "supplier": "",
-            "lifecycle": "PERENNIAL",
-            "compliance_file_url": "",
-            "organic": None,
-            "genetically_engineered": None,
-            "searched": None,
-            "crop_variety_photo_url": "https://litefarm.nyc3.cdn.digitaloceanspaces.com/default_crop/v2/default.webp",
-            "treated": None,
-            "hs_code_id": "0901",
-            "crop_varietal": "Typica",
-            "crop_cultivar": "Bourbon"
-        }
-    ]
-    return static_crop_varieties
 
     if not config.URL_LITEFARM:
         logging.error("URL_LITEFARM environment variable not set")
@@ -343,7 +227,7 @@ async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
         
     try:
         # TODO: Implement farm_id retrieval logic
-        farm_id = "5aa78ca8-3236-11f0-a33e-66ab45519382"  # Replace with actual farm ID retrieval logic
+        farm_id = config.FARM_ID  # Replace with actual farm ID retrieval logic
 
         """ 
         Header format must look like this:
@@ -356,7 +240,7 @@ async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
         """
 
         # TODO: Implement logic to retrieve the login token dynamically
-        token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNzcxMDE1YWMtMzIyZS0xMWYwLTk0YjQtNjZhYjQ1NTE5MzgyIiwiaWF0IjoxNzQ4MjUxMzMzLCJleHAiOjE3NDg4NTYxMzN9.-75_9cXDDuyIsimehvhPoo_xc5yU1mI3RQ5fkXct15U"
+        token=config.LOGIN_TOKEN
         
         headers = {
             "Content-Type": "application/json",
