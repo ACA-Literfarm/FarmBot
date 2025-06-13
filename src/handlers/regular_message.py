@@ -6,7 +6,15 @@ from aiogram.enums import ChatAction
 from services.ai_service import query_ai_model
 from services.api_service import handle_api_transaction, request_expense_types, request_revenue_types, request_crop_varieties
 from services.typing_context import show_typing
-from services.farm_service import farm_service
+from shared.services.farm_selection_service import FarmSelectionService
+from shared.repositories.farm_repository import FarmRepository
+from shared.repositories.chat_repository import ChatSessionRepository
+from shared.db.session import AsyncSessionLocal
+
+farm_service = FarmSelectionService(
+    repo_factory=FarmRepository,  # Replace with actual repository factory if needed
+    chat_session_repo_factory=ChatSessionRepository  # Replace with actual chat session repository
+)
 
 # Diccionario para rastrear el estado del usuario
 user_states = {}
@@ -132,16 +140,16 @@ async def handle_regular_message(message: Message):
     user_id = message.from_user.id  # Identificar al usuario por su ID
     user_input = message.text.strip()
 
-    # CHECK FARM SELECTION FIRST - Add this validation at the beginning
-    selected_farm = farm_service.get_selected_farm(str(user_id))
-    if not selected_farm:
-        await message.answer(
-            "❌ **Necesitas seleccionar una granja primero**\n\n"
-            "Usa /selectfarm para elegir la granja con la que quieres trabajar. "
-            "Todas las transacciones deben estar asociadas a una granja específica. 🏡",
-            parse_mode='Markdown'
-        )
-        return
+    # CHECK FARM SELECTION FIRST
+    async with AsyncSessionLocal() as db:
+        selected_farm = await farm_service.get_selected_farm(chat_id=message.chat.id, session=db)
+        
+        if not selected_farm:
+            await message.answer(
+                "❌ Necesitas seleccionar una granja primero.\n\nUsa /select_farm para elegir una granja con la que trabajar.",
+                parse_mode='Markdown'
+            )
+            return
 
     # Verificar si el usuario está completando un campo faltante
     if user_id in user_states:
@@ -164,7 +172,7 @@ async def handle_regular_message(message: Message):
             api_response = state["api_response"]
             
             # ADD FARM ID TO API RESPONSE - Add this line
-            api_response["farm_id"] = selected_farm["farm_id"]
+            api_response["farm_id"] = selected_farm.litefarm_farm_id
             
             del user_states[user_id]
             

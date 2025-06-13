@@ -6,7 +6,7 @@ from commands.start import cmd_start
 from commands.help import cmd_help
 from commands.login import cmd_login
 from commands.current_farm import cmd_current_farm
-from commands.select_farm import cmd_select_farm, handle_farm_selection_callback
+from commands.farm_commands import cmd_select_farm, handle_farm_selection_callback
 
 def register_handlers(dp: Dispatcher):
     """Register all message handlers with the dispatcher"""

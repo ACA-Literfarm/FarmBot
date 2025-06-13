@@ -267,10 +267,15 @@ async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
         logging.error(f"Crop varieties request error: {e}")
         return None
 
-async def request_user_farms() -> Optional[List[Dict[str, Any]]]:
+async def request_user_farms(
+        token: str,
+        userId: str
+        ) -> Optional[List[Dict[str, Any]]]:
     """
-    Request farms associated with the logged-in user from the LiteFarm API.
-    
+    Request user farms from the LiteFarm API.
+    Args:
+        token (str): Authorization token for the API.
+        userId (str): User ID to fetch farms for.
     Returns:
         List of farms if successful, None if there was an error
     """
@@ -280,11 +285,7 @@ async def request_user_farms() -> Optional[List[Dict[str, Any]]]:
         
     try:
         # TODO: Implement dynamic token retrieval
-        token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNzcxMDE1YWMtMzIyZS0xMWYwLTk0YjQtNjZhYjQ1NTE5MzgyIiwiaWF0IjoxNzQ5MDg1MDY2LCJleHAiOjE3NDk2ODk4NjZ9.vPYhOPjJlOdVsbKIk2a0jKTWdq4P6qns01Xg8ewhw-Q"
-
         # TODO: Implement dynamic user ID retrieval
-        userId = "771015ac-322e-11f0-94b4-66ab45519382"  # Replace with actual user ID retrieval logic
-
 
         headers = {
             "Content-Type": "application/json",
