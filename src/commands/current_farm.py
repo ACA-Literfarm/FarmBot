@@ -9,6 +9,10 @@ async def cmd_current_farm(message: Message) -> None:
     """
     Handle /currentfarm command to show currently selected farm.
     """
+    if not message.from_user:
+        await message.answer("❌ No se pudo identificar al usuario.")
+        return
+        
     user_id = str(message.from_user.id)
     
     try:

@@ -1,3 +1,9 @@
+import sys
+import os
+
+# # Add the root directory (parent of `shared`) to PYTHONPATH
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import asyncio
 import logging
 import sys
@@ -6,13 +12,13 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from commands.command_controller import register_handlers
 from config import config
+import shared.db.models
 
 # Validate that all required environment variables are set
 config.validate_required_vars()
 
 # Initialize the bot and dispatcher
 dp = Dispatcher()
-
 
 # Register all message handlers
 register_handlers(dp)

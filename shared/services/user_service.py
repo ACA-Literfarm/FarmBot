@@ -21,9 +21,9 @@ class UserService:
         return await repo.create_user(user)
 
     async def user_exists(
-        self, litefarm_user_id: str, session: AsyncSession
+        self, litefarm_user_id: str, 
+        session: AsyncSession
     ) -> bool:
         repo = self._repo_factory(session)
         user = await repo.get_user_by_user_id(litefarm_user_id)
-        return user is not None
-    
+        return bool(user)

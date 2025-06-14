@@ -3,7 +3,7 @@ from sqlalchemy import select, delete, update, insert
 from datetime import datetime, timezone
 from typing import Optional, Sequence, List
 
-from ...src.services.api_service import request_user_farms
+from src.services.api_service import request_user_farms
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ..db.models.farm import Farm

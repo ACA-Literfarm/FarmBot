@@ -10,6 +10,8 @@ from shared.services.farm_selection_service import FarmSelectionService
 from shared.repositories.farm_repository import FarmRepository
 from shared.repositories.chat_repository import ChatSessionRepository
 from shared.db.session import AsyncSessionLocal
+from shared.db.models.farm import Farm
+from typing import Optional
 
 farm_service = FarmSelectionService(
     repo_factory=FarmRepository,  # Replace with actual repository factory if needed
@@ -136,20 +138,25 @@ def format_currency_value(value: str) -> str:
     except (ValueError, AttributeError):
         return f"${value}" if value else ""
 
+async def get_valid_farm_or_error(message: Message) -> Optional[Farm]:
+    async with AsyncSessionLocal() as db:
+        print(f"Checking selected farm for chat_id: {message.chat.id}")
+        selected_farm = await farm_service.get_selected_farm(chat_id=message.chat.id, session=db)
+        if not selected_farm:
+            return None
+        return selected_farm
+
 async def handle_regular_message(message: Message):
     user_id = message.from_user.id  # Identificar al usuario por su ID
     user_input = message.text.strip()
 
     # CHECK FARM SELECTION FIRST
-    async with AsyncSessionLocal() as db:
-        selected_farm = await farm_service.get_selected_farm(chat_id=message.chat.id, session=db)
-        
-        if not selected_farm:
-            await message.answer(
-                "❌ Necesitas seleccionar una granja primero.\n\nUsa /select_farm para elegir una granja con la que trabajar.",
-                parse_mode='Markdown'
-            )
-            return
+    selected_farm = await get_valid_farm_or_error(message)
+    if not selected_farm:
+        await message.answer(
+            "❌ Necesitas seleccionar una granja primero.\n\nUsa /select_farm para elegir una granja con la que trabajar."
+        )
+        return
 
     # Verificar si el usuario está completando un campo faltante
     if user_id in user_states:
@@ -181,7 +188,7 @@ async def handle_regular_message(message: Message):
                 api_response["customer"] = "Cliente General"
             
             async with show_typing(message):
-                await handle_api_transaction(api_response)
+                await handle_api_transaction(api_response, "gasto") # TODO: Revisar los parametros de esta función, particularmente el tipo de transacción
             await message.answer(state["respuesta"])
             return
 
@@ -223,7 +230,7 @@ async def handle_regular_message(message: Message):
         })
 
         # ADD FARM ID TO API RESPONSE - Add this line right after getting api_response
-        api_response["farm_id"] = selected_farm["farm_id"]
+        api_response["farm_id"] = selected_farm.litefarm_farm_id
 
         # When an expense is detected, show available expense types
         # What it does: Based on the list of expense types, it formats them for user display.
@@ -261,7 +268,7 @@ async def handle_regular_message(message: Message):
                 formatted_value = format_currency_value(value)
 
                 # INCLUDE FARM NAME IN RESPONSE MESSAGE - Update response to include farm info
-                respuesta = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} en la granja **{selected_farm['farm_name']}** 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
+                respuesta = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} en la granja **{selected_farm.name}** 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
             else:
                 respuesta = "No pude identificar un tipo de gasto específico. Por favor, asegúrate de que el mensaje incluya un tipo de gasto válido.\n\n" + respuesta
 
@@ -299,7 +306,7 @@ async def handle_regular_message(message: Message):
             formatted_value = format_currency_value(value)
             
             # INCLUDE FARM NAME IN RESPONSE MESSAGE - Update response to include farm info
-            respuesta = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} en la granja **{selected_farm['farm_name']}** 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
+            respuesta = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} en la granja **{selected_farm.name}** 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
 
         # Handle non-related classification
         elif clasificacion == "no_relacionado":

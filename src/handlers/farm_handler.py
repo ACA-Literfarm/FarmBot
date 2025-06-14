@@ -19,7 +19,16 @@ chat_session_service = ChatSessionService(
 )
 
 async def farm_selection_callback(callback_query: types.CallbackQuery):
-    telegram_chat_id = callback_query.message.chat.id
+    if callback_query.message:
+        telegram_chat_id = callback_query.message.chat.id
+    else:
+        # Use from_user.id as fallback when message is None
+        telegram_chat_id = callback_query.from_user.id
+    
+    if callback_query.data is None:
+        await callback_query.answer("❌ Invalid callback data.", show_alert=True)
+        return
+        
     data = callback_query.data.split(":")
     
     if len(data) != 2 or not data[1]:
@@ -51,10 +60,19 @@ async def farm_selection_callback(callback_query: types.CallbackQuery):
                 token=token,
                 session=db
             )
-            await callback_query.message.answer("✅ Farm selected successfully.")
+            if callback_query.message:
+                await callback_query.message.answer("✅ Farm selected successfully.")
+            else:
+                await callback_query.answer("✅ Farm selected successfully.", show_alert=True)
         except ValueError as e:
-            await callback_query.message.answer(f"❌ {str(e)}")
+            if callback_query.message:
+                await callback_query.message.answer(f"❌ {str(e)}")
+            else:
+                await callback_query.answer(f"❌ {str(e)}", show_alert=True)
         except Exception as e:
-            await callback_query.message.answer("🚨 An unexpected error occurred. Please try again.")
+            if callback_query.message:
+                await callback_query.message.answer("🚨 An unexpected error occurred. Please try again.")
+            else:
+                await callback_query.answer("🚨 An unexpected error occurred. Please try again.", show_alert=True)
             # Optionally log error
             print(f"[ERROR] Farm selection failed: {e}")

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.db.models.farm import Farm
 from shared.interfaces.farm_interface import IFarmRepository
 from shared.interfaces.chat_interface import IChatSessionRepository
+from shared.db.models.chat_session import ChatSession
 
 class FarmSelectionService:
     def __init__(
@@ -68,6 +69,11 @@ class FarmSelectionService:
         farm_repo = self._repo_factory(session)
 
         chat_session = await chat_repo.get_chat_by_telegram_chat_id(chat_id)
+
+        # If no chat session is found, create a new one
+        if chat_session is None:
+            chat_session = await chat_repo.create_chat(ChatSession(telegram_chat_id=chat_id))
+
         if chat_session is not None and getattr(chat_session, "selected_farm_id", None) is not None:
             return await farm_repo.get_farm_by_id(getattr(chat_session, "selected_farm_id"))
         return None

@@ -30,6 +30,7 @@ class Config:
     LINK_SERVER: Optional[str] = os.getenv("LINK_SERVER")
     LOGIN_TOKEN: Optional[str] = os.getenv("LOGIN_TOKEN")
     FARM_ID: Optional[str] = os.getenv("FARM_ID")
+    LITEFARM_USER_ID: Optional[str] = os.getenv("LITEFARM_USER_ID")
     
     @classmethod
     def validate_required_vars(cls) -> None:

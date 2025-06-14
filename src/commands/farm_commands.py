@@ -4,10 +4,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.db.session import AsyncSessionLocal
 from shared.services.farm_selection_service import FarmSelectionService
 from shared.services.chat_service import ChatSessionService
+from shared.services.user_service import UserService
 # from src.services.token_service import get_token_for_user  # TODO: Implement this function to retrieve the token for the user
 from config import config
 from shared.repositories.farm_repository import FarmRepository
 from shared.repositories.chat_repository import ChatSessionRepository
+from shared.repositories.user_repository import UserRepository
+from shared.DTO.chat.chat_dto import ChatSessionCreateDTO
+from shared.DTO.user.user_dto import CreateUserDTO
+
+import logging
+from aiogram.types import Message
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Dependency-injected services
 farm_service = FarmSelectionService(
@@ -19,18 +28,51 @@ chat_session_service = ChatSessionService(
     repo_factory=ChatSessionRepository
 )
 
-async def select_farm_command(message: types.Message, state: FSMContext):
+user_service = UserService(
+    repo_factory=UserRepository
+)
+
+async def select_farm_command(message: types.Message):
     telegram_chat_id = message.chat.id
 
     async with AsyncSessionLocal() as db:
+        logger.info(f"Received /select_farm command from chat ID: {telegram_chat_id}")
+
         session = await chat_session_service.get_active_chat_by_telegram_id(
             telegram_chat_id=telegram_chat_id,
             session=db
         )
 
+        logger.info(f"Retrieved session for chat ID {telegram_chat_id}: {session}")
+
         if not session:
-            await message.answer("⚠️ No active session. Please log in first.")
-            return
+            # If no active session, you might want to redirect to login or handle it accordingly
+            # For now, we will create the session if it doesn't exist
+
+            logger.info(f"No active session found for chat ID {telegram_chat_id}. Creating new session.")
+
+            litefarm_user_id = config.LITEFARM_USER_ID if config.LITEFARM_USER_ID else ""
+
+            user = await user_service.user_exists(
+                litefarm_user_id=litefarm_user_id,  # TODO: Replace with actual user ID retrieval logic
+                session=db
+            )
+
+            if not user:
+                await user_service.create_user(
+                    CreateUserDTO(
+                        litefarm_user_id=litefarm_user_id,  # TODO: Replace with actual user ID retrieval logic
+                    ),
+                    session=db
+                )
+
+            session = await chat_session_service.create_chat_session(
+                dto=ChatSessionCreateDTO(
+                    litefarm_user_id=litefarm_user_id,  # TODO: Replace with actual user ID retrieval logic
+                    telegram_chat_id=telegram_chat_id
+                ),
+                session=db
+            )
 
         token = config.LOGIN_TOKEN or ""  # TODO: Replace with actual token retrieval logic
         farms = await farm_service.fetch_and_cache_farms(
@@ -55,7 +97,7 @@ async def select_farm_command(message: types.Message, state: FSMContext):
         await message.answer("Please select one of your farms:", reply_markup=keyboard)
 
 
-async def clear_farm_command(message: types.Message, state: FSMContext):
+async def clear_farm_command(message: Message):
     telegram_chat_id = message.chat.id
 
     async with AsyncSessionLocal() as db:
@@ -70,3 +112,32 @@ async def clear_farm_command(message: types.Message, state: FSMContext):
 
         await farm_service.clear_farm_selection(chat_id=telegram_chat_id, session=db)
         await message.answer("✅ Farm selection has been cleared.")
+
+async def current_farm_command(message: Message) -> None:
+    """
+    Handle /currentfarm command to show currently selected farm.
+    """
+    telegram_chat_id = message.chat.id
+
+    try:
+        async with AsyncSessionLocal() as db:
+            current_farm = await farm_service.get_selected_farm(chat_id=telegram_chat_id, session=db)
+
+            if current_farm:
+                await message.answer(
+                    f"🟢 **Granja actual:** {current_farm.name}\n\n"
+                    f"Todas las transacciones se registrarán en esta granja.\n"
+                    f"Usa /selectfarm para cambiar de granja.",
+                    parse_mode='Markdown'
+                )
+            else:
+                await message.answer(
+                    "❌ No tienes ninguna granja seleccionada.\n\n"
+                    "Usa /selectfarm para elegir una granja antes de registrar transacciones."
+                )
+
+    except Exception as e:
+        logging.error(f"Error in cmd_current_farm: {e}")
+        await message.answer(
+            "❌ Ocurrió un error al obtener la información de tu granja actual."
+        )
