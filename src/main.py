@@ -24,6 +24,8 @@ dp = Dispatcher()
 register_handlers(dp)
 
 async def main() -> None:
+    if config.TELEGRAM_API_KEY is None:
+        raise ValueError("TELEGRAM_API_KEY is not set")
     bot = Bot(token=config.TELEGRAM_API_KEY, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     await dp.start_polling(bot)
 

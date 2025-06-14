@@ -1,5 +1,6 @@
 from typing import Callable, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+from shared.DTO.farm.farm_dto import FarmDTO
 from shared.db.models.farm import Farm
 from shared.interfaces.farm_interface import IFarmRepository
 from shared.interfaces.chat_interface import IChatSessionRepository
@@ -64,7 +65,11 @@ class FarmSelectionService:
         farm_repo = self._repo_factory(session)
         await farm_repo.clear_selected_farm(chat_id=chat_id)
 
-    async def get_selected_farm(self, chat_id: int, session: AsyncSession) -> Optional[Farm]:
+    async def get_selected_farm(self, chat_id: int, session: AsyncSession) -> Optional[FarmDTO]:
+        """
+        Retrieve the currently selected farm for the user's active chat session.
+        Returns None if no farm is selected.
+        """
         chat_repo = self._chat_session_repo_factory(session)
         farm_repo = self._repo_factory(session)
 
@@ -74,6 +79,13 @@ class FarmSelectionService:
         if chat_session is None:
             chat_session = await chat_repo.create_chat(ChatSession(telegram_chat_id=chat_id))
 
+        # If chat session exists and has a selected farm, retrieve it
         if chat_session is not None and getattr(chat_session, "selected_farm_id", None) is not None:
-            return await farm_repo.get_farm_by_id(getattr(chat_session, "selected_farm_id"))
+            farm = await farm_repo.get_farm_by_id(str(chat_session.selected_farm_id))
+            if farm:
+                return FarmDTO(
+                    litefarm_farm_id=str(farm.litefarm_farm_id),
+                    name=str(farm.name)
+                )
+        # If chat session exists but no farm is selected, return None
         return None

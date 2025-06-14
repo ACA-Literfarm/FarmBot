@@ -25,15 +25,15 @@ def register_handlers(dp: Dispatcher):
     async def login_handler(message: Message):
         await cmd_login(message)
 
-    @dp.message(Command("select_farm"))
+    @dp.message(Command("selectfarm"))
     async def select_farm_handler(message: Message):
         await select_farm_command(message)
 
-    @dp.message(Command("current_farm"))
+    @dp.message(Command("currentfarm"))
     async def cmd_current_farm_handler(message: Message):
         await current_farm_command(message)
 
-    @dp.message(Command("clear_farm"))
+    @dp.message(Command("clearfarm"))
     async def clear_farm_command_handler(message: Message):
         await clear_farm_command(message)
 

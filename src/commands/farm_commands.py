@@ -36,7 +36,7 @@ async def select_farm_command(message: types.Message):
     telegram_chat_id = message.chat.id
 
     async with AsyncSessionLocal() as db:
-        logger.info(f"Received /select_farm command from chat ID: {telegram_chat_id}")
+        logger.info(f"Received /selectfarm command from chat ID: {telegram_chat_id}")
 
         session = await chat_session_service.get_active_chat_by_telegram_id(
             telegram_chat_id=telegram_chat_id,
@@ -76,7 +76,7 @@ async def select_farm_command(message: types.Message):
 
         token = config.LOGIN_TOKEN or ""  # TODO: Replace with actual token retrieval logic
         farms = await farm_service.fetch_and_cache_farms(
-            litefarm_user_id=session.litefarm_user_id,
+            litefarm_user_id=str(session.litefarm_user_id),
             token=token,
             session=db
         )

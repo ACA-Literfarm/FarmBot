@@ -6,12 +6,16 @@ from aiogram.enums import ChatAction
 from services.ai_service import query_ai_model
 from services.api_service import handle_api_transaction, request_expense_types, request_revenue_types, request_crop_varieties
 from services.typing_context import show_typing
+from shared.DTO.farm.farm_dto import FarmDTO
 from shared.services.farm_selection_service import FarmSelectionService
 from shared.repositories.farm_repository import FarmRepository
 from shared.repositories.chat_repository import ChatSessionRepository
 from shared.db.session import AsyncSessionLocal
 from shared.db.models.farm import Farm
 from typing import Optional
+import logging
+logging.basicConfig(level=logging.INFO)
+loggger = logging.getLogger(__name__)
 
 farm_service = FarmSelectionService(
     repo_factory=FarmRepository,  # Replace with actual repository factory if needed
@@ -138,23 +142,33 @@ def format_currency_value(value: str) -> str:
     except (ValueError, AttributeError):
         return f"${value}" if value else ""
 
-async def get_valid_farm_or_error(message: Message) -> Optional[Farm]:
+async def fetch_selected_farm_if_exists(chat_id: int) -> Optional[FarmDTO]:
     async with AsyncSessionLocal() as db:
-        print(f"Checking selected farm for chat_id: {message.chat.id}")
-        selected_farm = await farm_service.get_selected_farm(chat_id=message.chat.id, session=db)
+        loggger.info(f"Checking selected farm for chat_id: {chat_id}")
+        selected_farm = await farm_service.get_selected_farm(chat_id=chat_id, session=db)
         if not selected_farm:
             return None
         return selected_farm
 
 async def handle_regular_message(message: Message):
-    user_id = message.from_user.id  # Identificar al usuario por su ID
-    user_input = message.text.strip()
+    if not message.from_user:
+        await message.answer("❌ No se pudo identificar al usuario. Por favor, intenta nuevamente.")
+        return
+    user_id = message.from_user.id
+    user_input = message.text.strip() if message.text else ""
 
-    # CHECK FARM SELECTION FIRST
-    selected_farm = await get_valid_farm_or_error(message)
+    loggger.info(f"User {user_id} sent message: {user_input}")
+
+    chat_id = message.chat.id
+    if not chat_id:
+        await message.answer("❌ No se pudo identificar el chat. Por favor, intenta nuevamente.")
+        return
+
+    # Check if there is a selected farm
+    selected_farm = await fetch_selected_farm_if_exists(chat_id=chat_id)
     if not selected_farm:
         await message.answer(
-            "❌ Necesitas seleccionar una granja primero.\n\nUsa /select_farm para elegir una granja con la que trabajar."
+            "❌ Necesitas seleccionar una granja primero.\n\nPor favor use /selectfarm para elegir una granja con la que trabajar."
         )
         return
 
