@@ -311,7 +311,7 @@ async def handle_regular_message(message: Message):
 
         # Process final transaction
         async with show_typing(message):
-            await handle_api_transaction(api_response, clasificacion)
+            await handle_api_transaction(api_response, clasificacion, message)
         
         await message.answer(respuesta)
 
