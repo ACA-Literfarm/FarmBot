@@ -17,15 +17,19 @@ class TokenRepository(ITokenRepository):
         return result.scalar_one_or_none()
 
     async def get_valid_tokens_by_chat_session(self, chat_session_id: int) -> Sequence[Token]:
-        now = datetime.now(tz=timezone.utc)
+        # Ensure chat_session_id is a valid integer
+        chat_session_id = int(chat_session_id)
+        # Now get only valid tokens
         result = await self.db.execute(
             select(Token).where(
                 Token.chat_session_id == chat_session_id,
-                Token.expires_at > now,
                 Token.is_active == True
             )
         )
-        return result.scalars().all()
+        valid_tokens = result.scalars().all()
+        
+        return valid_tokens
+
 
     async def create_token(self, token: Token) -> Token:
         self.db.add(token)

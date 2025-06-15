@@ -340,6 +340,10 @@ async def handle_regular_message(message: Message):
         if clasificacion == "ingreso" and not api_response.get("customer"):
             api_response["customer"] = "Cliente General"
 
+        # Process final transaction
+        async with show_typing(message):
+            await handle_api_transaction(api_response, clasificacion, message)
+
         # Check if validation is enabled for this user
         user_id = message.from_user.id
         validation_enabled = get_validation_enabled(user_id)
