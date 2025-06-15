@@ -41,7 +41,7 @@ async def handle_confirmation_callback(callback: CallbackQuery):
             
             # Show typing while processing transaction
             async with show_typing(callback.message):
-                await handle_api_transaction(api_response, clasificacion)
+                await handle_api_transaction(api_response, clasificacion, callback.message)
             
             # Update message with success response
             success_message = state["transaction_details"].replace("Voy a registrar", "¡Listo! He registrado")

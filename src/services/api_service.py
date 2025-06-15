@@ -188,9 +188,12 @@ async def request_expense_types() -> Optional[List[Dict[str, Any]]]:
         return None
 
 # Request revenue types from LiteFarm API
-async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
+async def request_revenue_types(chat_session_id: int) -> Optional[List[Dict[str, Any]]]:
     """
     Request revenue types from the LiteFarm API.
+    
+    Args:
+        chat_session_id: Telegram chat ID to get the user's token
     
     Returns:
         List of revenue types if successful, None if there was an error
@@ -213,7 +216,10 @@ async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
         The farm_id is used to fetch revenue types specific to a farm.
         """
 
-        token=config.LOGIN_TOKEN
+        token = await get_valid_token_for_chat(chat_session_id)
+        if not token:
+            logging.error(f"No valid token found for chat_session_id: {chat_session_id}")
+            return None
         
         headers = {
             "Content-Type": "application/json",
@@ -251,9 +257,12 @@ async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
         return None
     
 # Request crop varieties from LiteFarm API
-async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
+async def request_crop_varieties(chat_session_id: int) -> Optional[List[Dict[str, Any]]]:
     """
     Request crop varieties from the LiteFarm API.
+    
+    Args:
+        chat_session_id: Telegram chat ID to get the user's token
     
     Returns:
         List of crop varieties if successful, None if there was an error
@@ -278,7 +287,10 @@ async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
         """
 
         # TODO: Implement logic to retrieve the login token dynamically
-        token=config.LOGIN_TOKEN
+        token = await get_valid_token_for_chat(chat_session_id)
+        if not token:
+            logging.error(f"No valid token found for chat_session_id: {chat_session_id}")
+            return None
         
         headers = {
             "Content-Type": "application/json",
