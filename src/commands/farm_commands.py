@@ -5,10 +5,11 @@ from shared.db.session import AsyncSessionLocal
 from shared.services.farm_selection_service import FarmSelectionService
 from shared.services.chat_service import ChatSessionService
 from shared.services.user_service import UserService
+from shared.repositories.token_repository import TokenRepository
+from shared.repositories.chat_repository import ChatSessionRepository
 # from src.services.token_service import get_token_for_user  # TODO: Implement this function to retrieve the token for the user
 from config import config
 from shared.repositories.farm_repository import FarmRepository
-from shared.repositories.chat_repository import ChatSessionRepository
 from shared.repositories.user_repository import UserRepository
 from shared.DTO.chat.chat_dto import ChatSessionCreateDTO
 from shared.DTO.user.user_dto import CreateUserDTO
@@ -31,6 +32,23 @@ chat_session_service = ChatSessionService(
 user_service = UserService(
     repo_factory=UserRepository
 )
+
+async def get_valid_token_for_chat(telegram_chat_id: int, session: AsyncSession):
+    """Get a valid token for the given telegram chat ID."""
+    try:
+        chatRepo = ChatSessionRepository(session)
+        tokenRepo = TokenRepository(session)
+        chat_session = await chatRepo.get_chat_by_telegram_chat_id(telegram_chat_id)
+        if chat_session is None:
+            return None
+        chat_session_id = chat_session.id
+        tokens = await tokenRepo.get_valid_tokens_by_chat_session(chat_session_id)
+        if tokens:
+            return tokens[0].token  # Return the actual token string
+        return None
+    except Exception as e:
+        print(f"Error getting valid token for chat {telegram_chat_id}: {e}")
+        return None
 
 async def select_farm_command(message: types.Message):
     telegram_chat_id = message.chat.id
@@ -74,7 +92,11 @@ async def select_farm_command(message: types.Message):
                 session=db
             )
 
-        token = config.LOGIN_TOKEN or ""  # TODO: Replace with actual token retrieval logic
+        token = await get_valid_token_for_chat(telegram_chat_id, db)
+        if not token:
+            await message.answer("❌ No valid token found. Please log in again using /login.")
+            return
+            
         farms = await farm_service.fetch_and_cache_farms(
             litefarm_user_id=str(session.litefarm_user_id),
             token=token,
