@@ -1,10 +1,14 @@
 from aiogram import Dispatcher
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from handlers.regular_message import handle_regular_message
+from handlers.callback_handler import handle_confirmation_callback
 from commands.start import cmd_start
 from commands.help import cmd_help
 from commands.login import cmd_login
+from commands.cancel import cmd_cancel
+from commands.disable_validation import cmd_deshabilitar_validacion
+from commands.enable_validation import cmd_habilitar_validacion
 
 def register_handlers(dp: Dispatcher):
     """Register all message handlers with the dispatcher"""
@@ -20,7 +24,22 @@ def register_handlers(dp: Dispatcher):
     @dp.message(Command("login"))
     async def login_handler(message: Message):
         await cmd_login(message)
-
+    
+    @dp.message(Command("cancel"))
+    async def cancel_handler(message: Message):
+        await cmd_cancel(message)
+    
+    @dp.message(Command("deshabilitar_validacion"))
+    async def deshabilitar_validacion_handler(message: Message):
+        await cmd_deshabilitar_validacion(message)
+    
+    @dp.message(Command("habilitar_validacion"))
+    async def habilitar_validacion_handler(message: Message):
+        await cmd_habilitar_validacion(message)
+    
+    @dp.callback_query(lambda c: c.data and (c.data.startswith("confirm_") or c.data.startswith("cancel_")))
+    async def confirmation_callback_handler(callback: CallbackQuery):
+        await handle_confirmation_callback(callback)
 
     @dp.message()
     async def handle_regular_message_wrapper(message: Message):

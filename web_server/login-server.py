@@ -211,6 +211,7 @@ def login_post():
                         'chat_id': chat_id,
                         'litefarm_user_id': litefarm_user_id
                     }
+                    print(f"Token: {token}")
                     # Return JSON response for AJAX request
                     return jsonify({'success': True, 'redirect': url_for('login_success')})
                 else:

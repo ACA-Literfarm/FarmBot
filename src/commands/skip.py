@@ -1,7 +1,7 @@
 from aiogram.types import Message
-from bot.state import user_states
+from handlers.regular_message import user_states, show_confirmation_message
 from services.api_service import handle_api_transaction
-from utils.typing_context import show_typing
+from services.typing_context import show_typing
 
 async def cmd_skip(message: Message):
     """
@@ -40,11 +40,11 @@ async def cmd_skip(message: Message):
         else:
             # All fields complete
             api_response = state["api_response"]
+            clasificacion = state.get("clasificacion", "")
+            respuesta = f"{state['respuesta']}\n\n✅ Se usó 'Cliente General' como cliente."
             del user_states[user_id]
             
-            async with show_typing(message):
-                await handle_api_transaction(api_response)
-            
-            await message.answer(f"{state['respuesta']}\n\n✅ Se usó 'Cliente General' como cliente.")
+            # Show confirmation message instead of directly processing
+            await show_confirmation_message(message, respuesta, api_response, clasificacion)
     else:
         await message.answer(f"❌ No puedes saltar el campo '{current_field}'. Es obligatorio.")
