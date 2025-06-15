@@ -7,6 +7,21 @@ from services.ai_service import query_ai_model
 from services.api_service import handle_api_transaction, request_expense_types, request_revenue_types, request_crop_varieties
 from services.typing_context import show_typing
 from commands.disable_validation import get_validation_enabled
+from shared.DTO.farm.farm_dto import FarmDTO
+from shared.services.farm_selection_service import FarmSelectionService
+from shared.repositories.farm_repository import FarmRepository
+from shared.repositories.chat_repository import ChatSessionRepository
+from shared.db.session import AsyncSessionLocal
+from shared.db.models.farm import Farm
+from typing import Optional
+import logging
+logging.basicConfig(level=logging.INFO)
+loggger = logging.getLogger(__name__)
+
+farm_service = FarmSelectionService(
+    repo_factory=FarmRepository,  # Replace with actual repository factory if needed
+    chat_session_repo_factory=ChatSessionRepository  # Replace with actual chat session repository
+)
 
 # Diccionario para rastrear el estado del usuario
 user_states = {}
@@ -128,9 +143,35 @@ def format_currency_value(value: str) -> str:
     except (ValueError, AttributeError):
         return f"${value}" if value else ""
 
+async def fetch_selected_farm_if_exists(chat_id: int) -> Optional[FarmDTO]:
+    async with AsyncSessionLocal() as db:
+        loggger.info(f"Checking selected farm for chat_id: {chat_id}")
+        selected_farm = await farm_service.get_selected_farm(chat_id=chat_id, session=db)
+        if not selected_farm:
+            return None
+        return selected_farm
+
 async def handle_regular_message(message: Message):
-    user_id = message.from_user.id  # Identificar al usuario por su ID
-    user_input = message.text.strip()
+    if not message.from_user:
+        await message.answer("❌ No se pudo identificar al usuario. Por favor, intenta nuevamente.")
+        return
+    user_id = message.from_user.id
+    user_input = message.text.strip() if message.text else ""
+
+    loggger.info(f"User {user_id} sent message: {user_input}")
+
+    chat_id = message.chat.id
+    if not chat_id:
+        await message.answer("❌ No se pudo identificar el chat. Por favor, intenta nuevamente.")
+        return
+
+    # Check if there is a selected farm
+    selected_farm = await fetch_selected_farm_if_exists(chat_id=chat_id)
+    if not selected_farm:
+        await message.answer(
+            "❌ Necesitas seleccionar una granja primero.\n\nPor favor use /selectfarm para elegir una granja con la que trabajar."
+        )
+        return
 
     # Verificar si el usuario está completando un campo faltante
     if user_id in user_states:
@@ -158,6 +199,10 @@ async def handle_regular_message(message: Message):
             api_response = state["api_response"]
             clasificacion = state.get("clasificacion", "")
             respuesta = state["respuesta"]
+            
+            # ADD FARM ID TO API RESPONSE - Add this line
+            api_response["farm_id"] = selected_farm.litefarm_farm_id
+            
             del user_states[user_id]
             
             # Apply default customer if empty for revenue
@@ -213,6 +258,9 @@ async def handle_regular_message(message: Message):
             "note": "", "value": "", "type": "", "date": "", "crop_variety": "", "customer": ""
         })
 
+        # ADD FARM ID TO API RESPONSE - Add this line right after getting api_response
+        api_response["farm_id"] = selected_farm.litefarm_farm_id
+
         # When an expense is detected, show available expense types
         # What it does: Based on the list of expense types, it formats them for user display.
         # This will also show the selected expense type if it exists in the response.
@@ -248,7 +296,8 @@ async def handle_regular_message(message: Message):
                 transaction_date = format_date_for_display(api_response.get("date", ""))
                 formatted_value = format_currency_value(value)
 
-                respuesta = f"Seleccioné este tipo: {selected_name}\n\nVoy a registrar {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} 🚜💸."
+                # INCLUDE FARM NAME IN RESPONSE MESSAGE - Update response to include farm info
+                respuesta = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} en la granja **{selected_farm.name}** 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
             else:
                 respuesta = "No pude identificar un tipo de gasto específico. Por favor, asegúrate de que el mensaje incluya un tipo de gasto válido.\n\n" + respuesta
 
@@ -285,8 +334,8 @@ async def handle_regular_message(message: Message):
             transaction_date = format_date_for_display(api_response.get("date", ""))
             formatted_value = format_currency_value(value)
             
-            # Create success response with customer info
-            respuesta = f"Seleccioné este tipo: {revenue_name}\n\nVoy a registrar {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} 🚜💰."
+            # INCLUDE FARM NAME IN RESPONSE MESSAGE - Update response to include farm info
+            respuesta = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} en la granja **{selected_farm.name}** 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
 
         # Handle non-related classification
         elif clasificacion == "no_relacionado":
@@ -308,7 +357,7 @@ async def handle_regular_message(message: Message):
             # Guardar el estado del usuario
             user_states[user_id] = {
                 "missing_fields": missing_fields,
-                "api_response": api_response,
+                "api_response": api_response,  # This already includes farm_id
                 "respuesta": respuesta,
                 "clasificacion": clasificacion,
             }

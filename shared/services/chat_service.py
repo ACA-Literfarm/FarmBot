@@ -3,6 +3,7 @@ from shared.db.models.chat_session import ChatSession
 from shared.DTO.chat.chat_dto import ChatSessionCreateDTO
 from shared.interfaces.chat_interface import IChatSessionRepository
 from collections.abc import Callable
+from shared.DTO.chat.chat_return_dto import ChatSessionOutDTO
 
 class ChatSessionService:
     def __init__(self, repo_factory: Callable[[AsyncSession], IChatSessionRepository]):
@@ -29,7 +30,11 @@ class ChatSessionService:
         self,
         telegram_chat_id: int,
         session: AsyncSession
-    ) -> ChatSession | None:
+    ) -> ChatSessionOutDTO | None:
         repo = self._repo_factory(session)
         chat = await repo.get_chat_by_telegram_chat_id(telegram_chat_id)
-        return chat if chat and chat.is_active else None
+
+        if chat and chat.is_active is True:
+            return ChatSessionOutDTO.model_validate(chat)
+
+        return None

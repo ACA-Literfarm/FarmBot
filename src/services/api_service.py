@@ -45,14 +45,14 @@ async def handle_api_transaction(api_response: dict, clasificacion: str, message
         await register_expense(
             expense_date=date,
             expense_type_id=transaction_type,
-            farm_id=config.FARM_ID,  # Assuming FARM_ID is set in config
+            farm_id=config.FARM_ID if config.FARM_ID is not None else "",  # Ensure farm_id is a string
             note=note,
             value=float(value),
             chat_session_id=chat_session_id 
         )
     elif clasificacion == "ingreso":
         await register_sale(
-            farm_id=config.FARM_ID,  # Assuming FARM_ID is set in config
+            farm_id=config.FARM_ID if config.FARM_ID is not None else "",  # Assuming FARM_ID is set in config
             customer_name=customer,
             sale_date=date,
             revenue_type_id=int(transaction_type),
@@ -303,4 +303,47 @@ async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
             return None
     except requests.RequestException as e:
         logging.error(f"Crop varieties request error: {e}")
+        return None
+
+async def request_user_farms(
+        token: str,
+        userId: str
+        ) -> Optional[List[Dict[str, Any]]]:
+    """
+    Request user farms from the LiteFarm API.
+    Args:
+        token (str): Authorization token for the API.
+        userId (str): User ID to fetch farms for.
+    Returns:
+        List of farms if successful, None if there was an error
+    """
+    if not config.URL_LITEFARM:
+        logging.error("URL_LITEFARM environment variable not set")
+        return None
+        
+    try:
+        # TODO: Implement dynamic token retrieval
+        # TODO: Implement dynamic user ID retrieval
+
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept-Language": "en",
+            "Authorization": f"Bearer {token}"
+        }
+
+        response = requests.get(f"{config.URL_LITEFARM}/user_farm/user/{userId}", headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if not data:
+                logging.error("User farms response is empty")
+                return None
+            return data
+        else:
+            logging.error(f"Error fetching user farms: {response.status_code}")
+            return None
+            
+    except requests.RequestException as e:
+        logging.error(f"Request error fetching farms: {e}")
         return None
