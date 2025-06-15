@@ -1,11 +1,12 @@
 import json
 import logging
 from datetime import datetime, date
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.enums import ChatAction
 from services.ai_service import query_ai_model
 from services.api_service import handle_api_transaction, request_expense_types, request_revenue_types, request_crop_varieties
 from services.typing_context import show_typing
+from commands.disable_validation import get_validation_enabled
 
 # Diccionario para rastrear el estado del usuario
 user_states = {}
@@ -139,26 +140,40 @@ async def handle_regular_message(message: Message):
 
         # Si aún faltan campos, solicitar el siguiente
         if state["missing_fields"]:
+            # Create inline keyboard with cancel button
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
+            ])
+            
             next_field = state["missing_fields"][0]
             if next_field == "value":
-                await message.answer("💰 Por favor, ingresa el precio de la transacción:")
+                await message.answer("💰 Por favor, ingresa el precio de la transacción:", reply_markup=keyboard)
             elif next_field == "note":
-                await message.answer("📝 Por favor, proporciona una breve descripción de la transacción:")
+                await message.answer("📝 Por favor, proporciona una breve descripción de la transacción:", reply_markup=keyboard)
             elif next_field == "type":
-                await message.answer("📂 Por favor, indica el tipo de transacción (por ejemplo: gasolina, maquinaria, plantas, otro):")
+                await message.answer("📂 Por favor, indica el tipo de transacción (por ejemplo: gasolina, maquinaria, plantas, otro):", reply_markup=keyboard)
             return
         else:
             # Todos los campos están completos
             api_response = state["api_response"]
+            clasificacion = state.get("clasificacion", "")
+            respuesta = state["respuesta"]
             del user_states[user_id]
             
             # Apply default customer if empty for revenue
             if api_response.get("customer") == "":
                 api_response["customer"] = "Cliente General"
             
-            async with show_typing(message):
-                await handle_api_transaction(api_response)
-            await message.answer(state["respuesta"])
+            # Check if validation is enabled for this user
+            user_id = message.from_user.id
+            validation_enabled = get_validation_enabled(user_id)
+            
+            if validation_enabled:
+                # Show confirmation message if validation is enabled
+                await show_confirmation_message(message, respuesta, api_response, clasificacion)
+            else:
+                # Process transaction directly if validation is disabled
+                await process_transaction_directly(message, respuesta, api_response, clasificacion)
             return
 
     # Si no hay estado previo, procesar el mensaje normalmente
@@ -233,7 +248,7 @@ async def handle_regular_message(message: Message):
                 transaction_date = format_date_for_display(api_response.get("date", ""))
                 formatted_value = format_currency_value(value)
 
-                respuesta = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
+                respuesta = f"Seleccioné este tipo: {selected_name}\n\nVoy a registrar {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} 🚜💸."
             else:
                 respuesta = "No pude identificar un tipo de gasto específico. Por favor, asegúrate de que el mensaje incluya un tipo de gasto válido.\n\n" + respuesta
 
@@ -271,7 +286,7 @@ async def handle_regular_message(message: Message):
             formatted_value = format_currency_value(value)
             
             # Create success response with customer info
-            respuesta = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
+            respuesta = f"Seleccioné este tipo: {revenue_name}\n\nVoy a registrar {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} 🚜💰."
 
         # Handle non-related classification
         elif clasificacion == "no_relacionado":
@@ -295,14 +310,30 @@ async def handle_regular_message(message: Message):
                 "missing_fields": missing_fields,
                 "api_response": api_response,
                 "respuesta": respuesta,
+                "clasificacion": clasificacion,
             }
+            
+            # Create inline keyboard with cancel button
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
+            ])
+            
             first_missing_field = missing_fields[0]
             if first_missing_field == "value":
-                await message.answer("💰 Faltó el precio de la transacción. Por favor, ingrésalo:")
+                await message.answer(
+                    "💰 Faltó el precio de la transacción. Por favor, ingrésalo:",
+                    reply_markup=keyboard
+                )
             elif first_missing_field == "note":
-                await message.answer("📝 Faltó la descripción de la transacción. Por favor, proporciónala:")
+                await message.answer(
+                    "📝 Faltó la descripción de la transacción. Por favor, proporciónala:",
+                    reply_markup=keyboard
+                )
             elif first_missing_field == "type":
-                await message.answer("📂 Faltó el tipo de transacción. Por favor, indícalo (por ejemplo: gasolina, maquinaria, plantas, otro):")
+                await message.answer(
+                    "📂 Faltó el tipo de transacción. Por favor, indícalo (por ejemplo: gasolina, maquinaria, plantas, otro):",
+                    reply_markup=keyboard
+                )
             return
 
         # Apply default customer if empty for revenue
@@ -312,8 +343,17 @@ async def handle_regular_message(message: Message):
         # Process final transaction
         async with show_typing(message):
             await handle_api_transaction(api_response, clasificacion, message)
+
+        # Check if validation is enabled for this user
+        user_id = message.from_user.id
+        validation_enabled = get_validation_enabled(user_id)
         
-        await message.answer(respuesta)
+        if validation_enabled:
+            # Show confirmation message if validation is enabled
+            await show_confirmation_message(message, respuesta, api_response, clasificacion)
+        else:
+            # Process transaction directly if validation is disabled
+            await process_transaction_directly(message, respuesta, api_response, clasificacion)
 
     except json.JSONDecodeError:
         logging.warning("Respuesta del modelo no tiene formato JSON válido. Respuesta recibida: %s", response_text)
@@ -321,3 +361,51 @@ async def handle_regular_message(message: Message):
             "❌ Lo siento, no entendí tu mensaje o hubo un error procesando la respuesta. "
             "Por favor, intenta reformular tu mensaje o usa /help para ver ejemplos de uso."
         )
+
+async def process_transaction_directly(message: Message, transaction_details: str, api_response: dict, clasificacion: str):
+    """
+    Process transaction directly without confirmation when validation is disabled.
+    """
+    try:
+        # Show typing while processing transaction
+        async with show_typing(message):
+            await handle_api_transaction(api_response, clasificacion)
+        
+        # Create success message
+        success_message = transaction_details.replace("Voy a registrar", "¡Listo! He registrado")
+        success_message += "\n\n✅ Transacción registrada exitosamente. Si tienes más gastos o ingresos para registrar, avísame."
+        success_message += "\n\n💡 *Validación deshabilitada* - Para habilitar confirmación usa /habilitar_validacion"
+        
+        await message.answer(success_message)
+        
+    except Exception as e:
+        logging.error(f"Error processing transaction directly: {e}")
+        await message.answer(
+            "❌ Error al procesar la transacción. Por favor, intenta nuevamente."
+        )
+
+async def show_confirmation_message(message: Message, transaction_details: str, api_response: dict, clasificacion: str):
+    """
+    Show confirmation message with inline keyboard buttons.
+    """
+    user_id = message.from_user.id
+    
+    # Store transaction data for confirmation
+    user_states[user_id] = {
+        "awaiting_confirmation": True,
+        "api_response": api_response,
+        "clasificacion": clasificacion,
+        "transaction_details": transaction_details
+    }
+    
+    # Create inline keyboard with confirmation buttons
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Confirmar", callback_data=f"confirm_{user_id}"),
+            InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_{user_id}")
+        ]
+    ])
+    
+    confirmation_text = f"{transaction_details}\n\n¿Estás seguro de realizar la acción?"
+    
+    await message.answer(confirmation_text, reply_markup=keyboard)

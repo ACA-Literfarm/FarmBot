@@ -244,6 +244,7 @@ async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
         else:
             # TODO: Show error message, not just log it (Catch if the jwt token is expired)
             logging.error(f"Error fetching revenue types: {response.status_code}")
+            logging.error(f"Error fetching revenue types: {response.text}")
             return None
     except requests.RequestException as e:
         logging.error(f"Revenue request error: {e}")
