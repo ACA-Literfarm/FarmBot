@@ -82,8 +82,36 @@ async def select_farm_command(message: types.Message):
         )
 
         if not farms:
-            await message.answer("❌ No farms found. Please create one in LiteFarm before continuing.")
+            await message.answer(
+                "❌ **No tienes granjas disponibles**\n\n"
+                "Para usar FarmBot necesitas crear una granja en LiteFarm primero.\n\n"
+                "📋 **Pasos a seguir:**\n"
+                "1. Ve a LiteFarm y crea una nueva granja\n"
+                "2. Regresa aquí y usa /selectfarm nuevamente\n\n"
+                "ℹ️ Sin una granja no podrás registrar transacciones.",
+                parse_mode='Markdown'
+            )
             return
+
+        # Auto-select if only one farm
+        if len(farms) == 1:
+            try:
+                await farm_service.select_farm(
+                    chat_id=telegram_chat_id,
+                    farm_id=str(farms[0].litefarm_farm_id),
+                    litefarm_user_id=str(session.litefarm_user_id),
+                    token=token,
+                    session=db
+                )
+                await message.answer(
+                    f"✅ **Granja seleccionada automáticamente**\n\n"
+                    f"🏡 **{farms[0].name}**\n\n"
+                    "Ya puedes empezar a registrar transacciones.",
+                    parse_mode='Markdown'
+                )
+                return
+            except Exception as e:
+                logger.error(f"Error auto-selecting farm: {e}")
 
         buttons = [
             [types.InlineKeyboardButton(
@@ -94,7 +122,12 @@ async def select_farm_command(message: types.Message):
         ]
         keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons, row_width=1)
 
-        await message.answer("Please select one of your farms:", reply_markup=keyboard)
+        await message.answer(
+            "🏡 **Selecciona una granja:**\n\n"
+            "Elige la granja donde quieres registrar tus transacciones:",
+            reply_markup=keyboard,
+            parse_mode='Markdown'
+        )
 
 
 async def clear_farm_command(message: Message):

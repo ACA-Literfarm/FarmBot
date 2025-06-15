@@ -9,6 +9,7 @@ from commands.start import cmd_start
 from commands.help import cmd_help
 from commands.login import cmd_login
 from commands.farm_commands import clear_farm_command, select_farm_command, current_farm_command
+from src.middleware.farm_validation import FarmValidationMiddleware
 
 def register_handlers(dp: Dispatcher):
     """Register all message handlers with the dispatcher"""
@@ -44,5 +45,8 @@ def register_handlers(dp: Dispatcher):
                   (c.data.startswith("select_farm:") or c.data == "remove_farm_selection")
                   )
     
+    # Register middleware
+    dp.message.middleware(FarmValidationMiddleware())
+
     # Regular message handler (should be last)
     dp.message.register(handle_regular_message)

@@ -91,7 +91,7 @@ class FarmValidationMiddleware(BaseMiddleware):
                 if len(farms) == 1:
                     await self.farm_service.select_farm(
                         chat_id=telegram_chat_id,
-                        farm_id=farms[0].litefarm_farm_id,
+                        farm_id=str(farms[0].litefarm_farm_id),
                         litefarm_user_id=str(session.litefarm_user_id),
                         token=token,
                         session=db
