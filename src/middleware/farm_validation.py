@@ -7,6 +7,7 @@ from shared.services.farm_selection_service import FarmSelectionService
 from shared.services.chat_service import ChatSessionService
 from shared.repositories.farm_repository import FarmRepository
 from shared.repositories.chat_repository import ChatSessionRepository
+from shared.repositories.token_repository import TokenRepository
 from config import config
 
 class FarmValidationMiddleware(BaseMiddleware):
@@ -25,6 +26,23 @@ class FarmValidationMiddleware(BaseMiddleware):
         self.excluded_commands = {
             '/start', '/help', '/login', '/selectfarm', '/currentfarm', '/clearfarm'
         }
+    
+    async def get_valid_token_for_chat(self, telegram_chat_id: int, session: AsyncSession):
+        """Get a valid token for the given telegram chat ID."""
+        try:
+            chatRepo = ChatSessionRepository(session)
+            tokenRepo = TokenRepository(session)
+            chat_session = await chatRepo.get_chat_by_telegram_chat_id(telegram_chat_id)
+            if chat_session is None:
+                return None
+            chat_session_id = chat_session.id
+            tokens = await tokenRepo.get_valid_tokens_by_chat_session(chat_session_id)
+            if tokens:
+                return tokens[0].token  # Return the actual token string
+            return None
+        except Exception as e:
+            print(f"Error getting valid token for chat {telegram_chat_id}: {e}")
+            return None
     
     async def __call__(
         self,
@@ -62,7 +80,13 @@ class FarmValidationMiddleware(BaseMiddleware):
                 return
                 
             # Check if user has farms available
-            token = config.LOGIN_TOKEN or ""
+            token = await self.get_valid_token_for_chat(telegram_chat_id, db)
+            if not token:
+                await event.answer(
+                    "❌ No tienes un token válido. Usa /login para autenticarte."
+                )
+                return
+                
             farms = await self.farm_service.fetch_and_cache_farms(
                 litefarm_user_id=str(session.litefarm_user_id),
                 token=token,
