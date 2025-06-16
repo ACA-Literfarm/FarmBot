@@ -15,6 +15,31 @@ from shared.repositories.token_repository import TokenRepository
 from shared.repositories.chat_repository import ChatSessionRepository
 from shared.db.session import AsyncSessionLocal
 
+async def get_selected_farm_id(chat_session_id: int) -> str:
+    """Get the selected farm ID for the given chat session."""
+    try:
+        # Import locally to avoid circular import
+        from shared.repositories.farm_repository import FarmRepository
+        from shared.repositories.chat_repository import ChatSessionRepository
+        from shared.services.farm_selection_service import FarmSelectionService
+        
+        farm_service = FarmSelectionService(
+            repo_factory=FarmRepository,
+            chat_session_repo_factory=ChatSessionRepository
+        )
+        
+        async with AsyncSessionLocal() as session:
+            selected_farm = await farm_service.get_selected_farm(
+                chat_id=chat_session_id,
+                session=session
+            )
+            if selected_farm:
+                return str(selected_farm.litefarm_farm_id)
+            return ""
+    except Exception as e:
+        logging.error(f"Error getting selected farm for chat {chat_session_id}: {e}")
+        return ""
+
 async def get_valid_token_for_chat(telegram_chat_id: int):
     try:
         async with AsyncSessionLocal() as session:
@@ -41,18 +66,24 @@ async def handle_api_transaction(api_response: dict, clasificacion: str, message
     customer = api_response.get("customer", "Cliente General")  
     chat_session_id = message.chat.id  # Use chat.id instead of from_user.id for telegram_chat_id
     
+    # Get selected farm ID for this chat
+    farm_id = await get_selected_farm_id(chat_session_id)
+    if not farm_id:
+        logging.error(f"No selected farm found for chat {chat_session_id}")
+        return
+    
     if clasificacion == "gasto":
         await register_expense(
             expense_date=date,
             expense_type_id=transaction_type,
-            farm_id=config.FARM_ID if config.FARM_ID is not None else "",  # Ensure farm_id is a string
+            farm_id=farm_id,
             note=note,
             value=float(value),
             chat_session_id=chat_session_id 
         )
     elif clasificacion == "ingreso":
         await register_sale(
-            farm_id=config.FARM_ID if config.FARM_ID is not None else "",  # Assuming FARM_ID is set in config
+            farm_id=farm_id,
             customer_name=customer,
             sale_date=date,
             revenue_type_id=int(transaction_type),
@@ -137,7 +168,7 @@ async def register_sale(
     payload = {
         "farm_id": farm_id,
         "customer_name": customer_name,
-        "sale_date": datetime.strptime(sale_date, "%Y-%m-%d").isoformat() + "Z",
+        "sale_date": sale_date,
         "revenue_type_id": revenue_type_id,
         "note": note,
         "crop_variety_sale": crop_variety_sale
@@ -188,9 +219,12 @@ async def request_expense_types() -> Optional[List[Dict[str, Any]]]:
         return None
 
 # Request revenue types from LiteFarm API
-async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
+async def request_revenue_types(chat_session_id: int) -> Optional[List[Dict[str, Any]]]:
     """
     Request revenue types from the LiteFarm API.
+    
+    Args:
+        chat_session_id: Telegram chat ID to get the user's token
     
     Returns:
         List of revenue types if successful, None if there was an error
@@ -201,7 +235,11 @@ async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
         return None
         
     try:
-        farm_id = config.FARM_ID
+        # Get selected farm ID for this chat
+        farm_id = await get_selected_farm_id(chat_session_id)
+        if not farm_id:
+            logging.error(f"No selected farm found for chat {chat_session_id}")
+            return None
 
         """ 
         Header format must look like this:
@@ -213,7 +251,10 @@ async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
         The farm_id is used to fetch revenue types specific to a farm.
         """
 
-        token=config.LOGIN_TOKEN
+        token = await get_valid_token_for_chat(chat_session_id)
+        if not token:
+            logging.error(f"No valid token found for chat_session_id: {chat_session_id}")
+            return None
         
         headers = {
             "Content-Type": "application/json",
@@ -251,9 +292,12 @@ async def request_revenue_types() -> Optional[List[Dict[str, Any]]]:
         return None
     
 # Request crop varieties from LiteFarm API
-async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
+async def request_crop_varieties(chat_session_id: int) -> Optional[List[Dict[str, Any]]]:
     """
     Request crop varieties from the LiteFarm API.
+    
+    Args:
+        chat_session_id: Telegram chat ID to get the user's token
     
     Returns:
         List of crop varieties if successful, None if there was an error
@@ -264,8 +308,11 @@ async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
         return None
         
     try:
-        # TODO: Implement farm_id retrieval logic
-        farm_id = config.FARM_ID  # Replace with actual farm ID retrieval logic
+        # Get selected farm ID for this chat
+        farm_id = await get_selected_farm_id(chat_session_id)
+        if not farm_id:
+            logging.error(f"No selected farm found for chat {chat_session_id}")
+            return None
 
         """ 
         Header format must look like this:
@@ -278,7 +325,10 @@ async def request_crop_varieties() -> Optional[List[Dict[str, Any]]]:
         """
 
         # TODO: Implement logic to retrieve the login token dynamically
-        token=config.LOGIN_TOKEN
+        token = await get_valid_token_for_chat(chat_session_id)
+        if not token:
+            logging.error(f"No valid token found for chat_session_id: {chat_session_id}")
+            return None
         
         headers = {
             "Content-Type": "application/json",

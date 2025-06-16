@@ -145,7 +145,6 @@ def format_currency_value(value: str) -> str:
 
 async def fetch_selected_farm_if_exists(chat_id: int) -> Optional[FarmDTO]:
     async with AsyncSessionLocal() as db:
-        loggger.info(f"Checking selected farm for chat_id: {chat_id}")
         selected_farm = await farm_service.get_selected_farm(chat_id=chat_id, session=db)
         if not selected_farm:
             return None
@@ -157,8 +156,6 @@ async def handle_regular_message(message: Message):
         return
     user_id = message.from_user.id
     user_input = message.text.strip() if message.text else ""
-
-    loggger.info(f"User {user_id} sent message: {user_input}")
 
     chat_id = message.chat.id
     if not chat_id:
@@ -228,18 +225,20 @@ async def handle_regular_message(message: Message):
 
     # Mostrar escritura mientras se obtienen datos y se procesa la IA
     async with show_typing(message):
+        chat_session_id = message.chat.id
+        
         # Solicitar todos los tipos de datos
         expense_type = await request_expense_types()
         if expense_type is None:
             await message.answer("Hubo un error en el servidor obteniendo tipos de gastos, intentalo mas tarde.")
             return
         
-        revenue_type = await request_revenue_types()
+        revenue_type = await request_revenue_types(chat_session_id)
         if revenue_type is None or len(revenue_type) < 1:
             await message.answer("Hubo un error en el servidor obteniendo tipos de ingresos, intentalo mas tarde.")
             return
 
-        crop_varieties = await request_crop_varieties()
+        crop_varieties = await request_crop_varieties(chat_session_id)
         
         if crop_varieties is None or len(crop_varieties) < 1:
             await message.answer("Hubo un error en el servidor obteniendo variedades de cultivos, intentalo mas tarde.")
@@ -418,7 +417,7 @@ async def process_transaction_directly(message: Message, transaction_details: st
     try:
         # Show typing while processing transaction
         async with show_typing(message):
-            await handle_api_transaction(api_response, clasificacion)
+            await handle_api_transaction(api_response, clasificacion, message=message)
         
         # Create success message
         success_message = transaction_details.replace("Voy a registrar", "¡Listo! He registrado")
