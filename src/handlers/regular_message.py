@@ -145,7 +145,6 @@ def format_currency_value(value: str) -> str:
 
 async def fetch_selected_farm_if_exists(chat_id: int) -> Optional[FarmDTO]:
     async with AsyncSessionLocal() as db:
-        loggger.info(f"Checking selected farm for chat_id: {chat_id}")
         selected_farm = await farm_service.get_selected_farm(chat_id=chat_id, session=db)
         if not selected_farm:
             return None
@@ -157,8 +156,6 @@ async def handle_regular_message(message: Message):
         return
     user_id = message.from_user.id
     user_input = message.text.strip() if message.text else ""
-
-    loggger.info(f"User {user_id} sent message: {user_input}")
 
     chat_id = message.chat.id
     if not chat_id:
