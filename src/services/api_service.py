@@ -168,7 +168,7 @@ async def register_sale(
     payload = {
         "farm_id": farm_id,
         "customer_name": customer_name,
-        "sale_date": datetime.strptime(sale_date, "%Y-%m-%d").isoformat() + "Z",
+        "sale_date": sale_date,
         "revenue_type_id": revenue_type_id,
         "note": note,
         "crop_variety_sale": crop_variety_sale
