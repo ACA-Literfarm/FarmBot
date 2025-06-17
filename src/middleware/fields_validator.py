@@ -53,19 +53,22 @@ def validate_revenue_fields(api_response: dict) -> Tuple[List[str], str]:
     """
     Validate required fields for revenue transactions based on register_sale API requirements.
     
-    API Requirements:
+    API Requirements (register_sale parameters):
+    - customer_name: str (mapped from "customer" - defaults to "Cliente General")
+    - sale_date: str (mapped from "date" - defaults to today)
+    - revenue_type_id: int (mapped from "type")
     - note: str (required)
-    - value: float (required) 
-    - revenue_type_id: int (required - mapped from "type" field)
-    - crop_variety: int (required only for crop sales - revenue_type_id = 1)
-    - customer_name: str (optional - defaults to "Cliente General")
-    - sale_date: str (optional - defaults to today)
+    - crop_variety_sale: list (built from "crop_variety" and "value")
+      - crop_variety_id: from "crop_variety"
+      - quantity: 1 (default)
+      - quantity_unit: "kg" (default)
+      - sale_value: from "value"
     
     Returns: (missing_fields, error_message)
     """
     missing_fields = []
     
-    # Required fields for revenue
+    # Required fields for all revenue transactions
     if not api_response.get("note"):
         missing_fields.append("note")
     if not api_response.get("value"):
@@ -73,14 +76,23 @@ def validate_revenue_fields(api_response: dict) -> Tuple[List[str], str]:
     if not api_response.get("type"):
         missing_fields.append("type")
     
-    # Check if crop_variety is required for crop sales (revenue_type_id = 1)
-    revenue_type = api_response.get("type", "")
-    if str(revenue_type) == "1" and not api_response.get("crop_variety"):
-        missing_fields.append("crop_variety")
+    # Set default customer if not provided
+    if not api_response.get("customer"):
+        api_response["customer"] = "Cliente General"
     
     # Set current date if "date" field is missing or empty
     if not api_response.get("date"):
         api_response["date"] = date.today().strftime("%Y-%m-%d")
+    
+    # For crop sales (type = "1"), validate additional fields
+    revenue_type = api_response.get("type", "")
+    if str(revenue_type) == "1":  # Crop sale
+        if not api_response.get("crop_variety"):
+            missing_fields.append("crop_variety")
+        if not api_response.get("quantity"):
+            missing_fields.append("quantity")
+        if not api_response.get("quantity_unit"):
+            missing_fields.append("quantity_unit")
     
     error_message = ""
     if missing_fields:
@@ -89,14 +101,16 @@ def validate_revenue_fields(api_response: dict) -> Tuple[List[str], str]:
             "note": "📝 Descripción de la venta",
             "value": "💰 Valor/monto",
             "type": "📂 Tipo de ingreso",
-            "crop_variety": "🌱 Variedad de cultivo (requerida para ventas de cultivos)"
+            "crop_variety": "🌱 Variedad de cultivo",
+            "quantity": "📊 Cantidad vendida",
+            "quantity_unit": "📏 Unidad de medida (ej: kg, unidades)"
         }
         for field in missing_fields:
             error_message += f"• {field_names.get(field, field)}\n"
         
-        # Add helpful message for crop variety
-        if "crop_variety" in missing_fields:
-            error_message += "\n💡 **Nota:** Para ventas de cultivos, especifica qué cultivo vendiste (ej: tomates, lechugas, etc.)"
+        # Add helpful messages for crop sales
+        if any(field in missing_fields for field in ["crop_variety", "quantity", "quantity_unit"]):
+            error_message += "\n💡 **Nota:** Para ventas de cultivos, especifica el cultivo, cantidad y unidad (ej: 10 kg de tomates)"
     
     return missing_fields, error_message
 

@@ -63,7 +63,10 @@ async def handle_api_transaction(api_response: dict, clasificacion: str, message
     transaction_type = api_response.get("type", "")
     date = api_response.get("date", "")
     crop_variety = api_response.get("crop_variety", "")
-    customer = api_response.get("customer", "Cliente General")  
+    customer = api_response.get("customer", "")
+    quantity = api_response.get("quantity", 1)
+    quantity_unit = api_response.get("quantity_unit", "kg")
+
     chat_session_id = message.chat.id  # Use chat.id instead of from_user.id for telegram_chat_id
     
     # Get selected farm ID for this chat
@@ -90,8 +93,8 @@ async def handle_api_transaction(api_response: dict, clasificacion: str, message
             note=note,
             crop_variety_sale=[{
                 "crop_variety_id": crop_variety,
-                "quantity": 1,  # Assuming quantity is 1 for simplicity
-                "quantity_unit": "kg",  # Assuming unit is kg for simplicity
+                "quantity": int(quantity),
+                "quantity_unit": quantity_unit,
                 "sale_value": float(value)
             }],
             chat_session_id=chat_session_id
@@ -124,8 +127,6 @@ async def register_expense(
         "note": note,
         "value": float(value)
     }]
-
-    logging.info(payload);
 
     try:
         response = requests.post(

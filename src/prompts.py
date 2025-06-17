@@ -47,7 +47,9 @@ Si el usuario menciona una venta de tomates y los tomates sí existen en la list
     "type": "[ID del tipo de ingreso asociado]",
     "date": "",
     "crop_variety": "[ID de la variedad de cultivo asociado si es que existe en la lista de variedades de cultivo]",
-    "customer": "Juan Pérez"
+    "customer": "Juan Pérez",
+    "quantity": "[cantidad vendida, por ejemplo '10']",
+    "quantity_unit": "[unidad de medida, por ejemplo 'kg']",
   }
 }
 
@@ -61,7 +63,9 @@ Si el usuario menciona un ingreso por tomates, pero los tomates NO existen en la
     "type": "[ID del tipo de ingreso asociado]",
     "date": "",
     "crop_variety": "",
-    "customer": ""
+    "customer": "",
+    "quantity": "[cantidad vendida, por ejemplo '10 kg']",
+    "quantity_unit": "[unidad de medida, por ejemplo 'kg']",
   }
 }
 
@@ -94,6 +98,7 @@ Instrucciones adicionales:
 - Para identificar un gasto, busca frases como "compré", "gasté", "pagué", "invertí", "me costó", etc.
 - Para ingresos, selecciona el tipo de ingreso (type) más apropiado de la lista proporcionada en 'Revenue types'.
 - Si es posible, usa el ID del tipo de ingreso para el campo 'type' en lugar del nombre.
+- El usuario debe de especificar la cantidad de cultivos vendido, por ejemplo, '10 kg'
 
 REGLAS PARA CUSTOMER (solo para ingresos):
 - Para ingresos, extrae el nombre del cliente mencionado en el mensaje.

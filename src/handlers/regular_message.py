@@ -117,6 +117,7 @@ async def handle_missing_field_completion(message: Message, user_id: int, user_i
     state = user_states[user_id]
     missing_field = state["missing_fields"].pop(0)  # Obtener el siguiente campo faltante
     state["api_response"][missing_field] = user_input  # Guardar el valor proporcionado
+    logging.info(f"User {user_id} provided value for missing field '{missing_field}': {user_input}")
 
     # Si aún faltan campos, solicitar el siguiente
     if state["missing_fields"]:
@@ -185,7 +186,9 @@ async def request_next_missing_field(message: Message, user_id: int, field_name:
         "note": "📝 Por favor, proporciona una descripción de la transacción:",
         "type": "📂 Por favor, indica el tipo de transacción:",
         "crop_variety": "🌱 Por favor, especifica la variedad de cultivo:",
-        "customer": "👤 Por favor, indica el nombre del cliente:"
+        "customer": "👤 Por favor, indica el nombre del cliente:",
+        "quantity": "📊 Por favor, indica la cantidad vendida (ej: 10):",
+        "quantity_unit": "📏 Por favor, indica la unidad de medida (ej: kg, unidades, litros):"
     }
     
     message_text = field_messages.get(field_name, f"Por favor, proporciona el campo: {field_name}")
@@ -225,7 +228,6 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
         api_response = data.get("respuesta_api", {
             "note": "", "value": "", "type": "", "date": "", "crop_variety": "", "customer": ""
         })
-        logging.info(api_response);
 
         # ADD FARM ID TO API RESPONSE
         api_response["farm_id"] = selected_farm.litefarm_farm_id
@@ -375,12 +377,13 @@ async def process_transaction_directly(message: Message, transaction_details: st
         async with show_typing(message):
             await handle_api_transaction(api_response, clasificacion, message=message)
         
+        #TODO: Add logic to handle the response from the API if needed
         # Create success message
         success_message = transaction_details.replace("Voy a registrar", "¡Listo! He registrado")
         success_message += "\n\n✅ Transacción registrada exitosamente. Si tienes más gastos o ingresos para registrar, avísame."
         success_message += "\n\n💡 *Validación deshabilitada* - Para habilitar confirmación usa /habilitar_validacion"
         
-        await message.answer(success_message)
+        await message.answer(success_message);
         
     except Exception as e:
         logging.error(f"Error processing transaction directly: {e}")
