@@ -12,12 +12,11 @@ def validate_expense_fields(api_response: dict) -> Tuple[List[str], str]:
     """
     Validate required fields for expense transactions based on register_expense API requirements.
     
-    API Requirements (from api_service.py register_expense):
-    - expense_date: str (optional - defaults to today if not provided)
-    - expense_type_id: int (required)
-    - farm_id: str (automatically added from selected farm)
+    API Requirements:
     - note: str (required)
     - value: float (required)
+    - expense_type_id: int (required - mapped from "type" field)
+    - expense_date: str (optional - defaults to today)
     
     Returns: (missing_fields, error_message)
     """
@@ -31,53 +30,13 @@ def validate_expense_fields(api_response: dict) -> Tuple[List[str], str]:
     if not api_response.get("type"):
         missing_fields.append("type")
     
-    # Validate value is numeric and positive
-    value = api_response.get("value", "")
-    if value:
-        try:
-            float_value = float(value)
-            if float_value <= 0:
-                missing_fields.append("positive_value")
-        except (ValueError, TypeError):
-            missing_fields.append("valid_value")
-    
-    # Validate type is numeric (expense_type_id)
-    expense_type = api_response.get("type", "")
-    if expense_type:
-        try:
-            int(expense_type)
-        except (ValueError, TypeError):
-            missing_fields.append("valid_type")
-    
-    # Validate note length (avoid very long descriptions)
-    note = api_response.get("note", "")
-    if note and len(note) > 255:
-        missing_fields.append("note_length")
-    
-    # Validate date format if provided
-    date = api_response.get("date", "")
-    if date:
-        try:
-            from datetime import datetime
-            datetime.strptime(date, "%Y-%m-%d")
-        except ValueError:
-            missing_fields.append("valid_date")
-    
-    # date is optional - if empty, today's date will be used
-    # farm_id is added automatically from selected farm
-    
     error_message = ""
     if missing_fields:
         error_message = f"❌ **Faltan campos para registrar el gasto:**\n"
         field_names = {
             "note": "📝 Descripción del gasto",
             "value": "💰 Valor/monto",
-            "type": "📂 Tipo de gasto",
-            "valid_value": "💰 Valor válido (debe ser un número positivo)",
-            "positive_value": "💰 Valor positivo (debe ser mayor a 0)",
-            "valid_type": "📂 Tipo de gasto válido",
-            "note_length": "📝 Descripción (máximo 255 caracteres)",
-            "valid_date": "📅 Fecha válida (formato YYYY-MM-DD)"
+            "type": "📂 Tipo de gasto"
         }
         for field in missing_fields:
             error_message += f"• {field_names.get(field, field)}\n"
@@ -89,19 +48,13 @@ def validate_revenue_fields(api_response: dict) -> Tuple[List[str], str]:
     """
     Validate required fields for revenue transactions based on register_sale API requirements.
     
-    API Requirements (from api_service.py register_sale):
-    - farm_id: str (automatically added from selected farm)
-    - customer_name: str (optional - defaults to "Cliente General")
-    - sale_date: str (optional - defaults to today if not provided)
-    - revenue_type_id: int (required)
+    API Requirements:
     - note: str (required)
-    - crop_variety_sale: list (required for crop sales, contains crop_variety_id, quantity, quantity_unit, sale_value)
-    
-    For crop_variety_sale, each item requires:
-    - crop_variety_id: ID of the crop variety (required for crop sales)
-    - quantity: number (defaults to 1)
-    - quantity_unit: string (defaults to "kg")
-    - sale_value: float (uses the main value)
+    - value: float (required) 
+    - revenue_type_id: int (required - mapped from "type" field)
+    - crop_variety: int (required only for crop sales - revenue_type_id = 1)
+    - customer_name: str (optional - defaults to "Cliente General")
+    - sale_date: str (optional - defaults to today)
     
     Returns: (missing_fields, error_message)
     """
@@ -115,50 +68,10 @@ def validate_revenue_fields(api_response: dict) -> Tuple[List[str], str]:
     if not api_response.get("type"):
         missing_fields.append("type")
     
-    # Validate value is numeric and positive
-    value = api_response.get("value", "")
-    if value:
-        try:
-            float_value = float(value)
-            if float_value <= 0:
-                missing_fields.append("positive_value")
-        except (ValueError, TypeError):
-            missing_fields.append("valid_value")
-    
-    # Validate type is numeric (revenue_type_id)
-    revenue_type = api_response.get("type", "")
-    if revenue_type:
-        try:
-            int(revenue_type)
-        except (ValueError, TypeError):
-            missing_fields.append("valid_type")
-    
     # Check if crop_variety is required for crop sales (revenue_type_id = 1)
-    # Based on the API, crop sales need crop_variety_id in crop_variety_sale array
+    revenue_type = api_response.get("type", "")
     if str(revenue_type) == "1" and not api_response.get("crop_variety"):
         missing_fields.append("crop_variety")
-    
-    # Validate crop_variety is numeric if provided
-    crop_variety = api_response.get("crop_variety", "")
-    if crop_variety:
-        try:
-            int(crop_variety)
-        except (ValueError, TypeError):
-            missing_fields.append("valid_crop_variety")
-    
-    # Validate customer name length if provided (avoid very long names)
-    customer = api_response.get("customer", "")
-    if customer and len(customer) > 100:
-        missing_fields.append("customer_length")
-    
-    # Validate note length (avoid very long descriptions)
-    note = api_response.get("note", "")
-    if note and len(note) > 255:
-        missing_fields.append("note_length")
-    
-    # customer is optional - defaults to "Cliente General"
-    # sale_date is optional - defaults to today if not provided
-    # farm_id is added automatically from selected farm
     
     error_message = ""
     if missing_fields:
@@ -167,13 +80,7 @@ def validate_revenue_fields(api_response: dict) -> Tuple[List[str], str]:
             "note": "📝 Descripción de la venta",
             "value": "💰 Valor/monto",
             "type": "📂 Tipo de ingreso",
-            "crop_variety": "🌱 Variedad de cultivo (requerida para ventas de cultivos)",
-            "valid_value": "💰 Valor válido (debe ser un número positivo)",
-            "positive_value": "💰 Valor positivo (debe ser mayor a 0)",
-            "valid_type": "📂 Tipo de ingreso válido",
-            "valid_crop_variety": "🌱 Variedad de cultivo válida",
-            "customer_length": "👤 Nombre del cliente (máximo 100 caracteres)",
-            "note_length": "📝 Descripción (máximo 255 caracteres)"
+            "crop_variety": "🌱 Variedad de cultivo (requerida para ventas de cultivos)"
         }
         for field in missing_fields:
             error_message += f"• {field_names.get(field, field)}\n"

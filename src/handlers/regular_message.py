@@ -92,59 +92,108 @@ async def handle_regular_message(message: Message):
         )
         return
 
-    # Verificar si el usuario está completando un campo faltante
-    if user_id in user_states:
-        state = user_states[user_id]
-        missing_field = state["missing_fields"].pop(0)  # Obtener el siguiente campo faltante
-        state["api_response"][missing_field] = user_input  # Guardar el valor proporcionado
+    # STEP 1: Verificar si el usuario está completando campos faltantes
+    if user_id in user_states and user_states[user_id].get("missing_fields"):
+        await handle_missing_field_completion(message, user_id, user_input, selected_farm)
+        return
 
-        # Si aún faltan campos, solicitar el siguiente
-        if state["missing_fields"]:
-            # Create inline keyboard with cancel button
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
-            ])
-            
-            next_field = state["missing_fields"][0]
-            if next_field == "value":
-                await message.answer("💰 Por favor, ingresa el precio de la transacción:", reply_markup=keyboard)
-            elif next_field == "note":
-                await message.answer("📝 Por favor, proporciona una breve descripción de la transacción:", reply_markup=keyboard)
-            elif next_field == "type":
-                await message.answer("📂 Por favor, indica el tipo de transacción (por ejemplo: gasolina, maquinaria, plantas, otro):", reply_markup=keyboard)
-            return
-        else:
-            # Todos los campos están completos
-            api_response = state["api_response"]
-            clasificacion = state.get("clasificacion", "")
-            respuesta = state["respuesta"]
-            
-            # ADD FARM ID TO API RESPONSE - Add this line
-            api_response["farm_id"] = selected_farm.litefarm_farm_id
-            
-            del user_states[user_id]
-            
-            # Apply default customer if empty for revenue
-            if api_response.get("customer") == "":
-                api_response["customer"] = "Cliente General"
-            
-            # Check if validation is enabled for this user
-            user_id = message.from_user.id
-            validation_enabled = get_validation_enabled(user_id)
-            
-            if validation_enabled:
-                # Show confirmation message if validation is enabled
-                await show_confirmation_message(message, respuesta, api_response, clasificacion)
-            else:
-                # Process transaction directly if validation is disabled
-                await process_transaction_directly(message, respuesta, api_response, clasificacion)
-            return
-
-    # Si no hay estado previo, procesar el mensaje normalmente
+    # STEP 2: Si no hay estado previo, procesar el mensaje normalmente
     if not user_input:
         await message.answer("⚠️ El mensaje está vacío. Por favor, escribe algo para que pueda ayudarte.")
         return
 
+    # STEP 3: Procesar mensaje con IA y validar campos
+    try:
+        await process_new_message(message, user_input, selected_farm, user_id)
+    except Exception as e:
+        logging.error(f"Error processing message: {e}")
+        await message.answer(
+            "❌ Lo siento, hubo un error procesando tu mensaje. Por favor, intenta nuevamente."
+        )
+
+
+async def handle_missing_field_completion(message: Message, user_id: int, user_input: str, selected_farm):
+    """Handle completion of missing fields by the user."""
+    state = user_states[user_id]
+    missing_field = state["missing_fields"].pop(0)  # Obtener el siguiente campo faltante
+    state["api_response"][missing_field] = user_input  # Guardar el valor proporcionado
+
+    # Si aún faltan campos, solicitar el siguiente
+    if state["missing_fields"]:
+        await request_next_missing_field(message, user_id, state["missing_fields"][0])
+        return
+    else:
+        # Todos los campos están completos, procesar transacción
+        api_response = state["api_response"]
+        clasificacion = state.get("clasificacion", "")
+        respuesta = state["respuesta"]
+        
+        # ADD FARM ID TO API RESPONSE
+        api_response["farm_id"] = selected_farm.litefarm_farm_id
+        
+        # Clear user state
+        del user_states[user_id]
+        
+        # Apply default customer if empty for revenue
+        if clasificacion == "ingreso" and not api_response.get("customer"):
+            api_response["customer"] = "Cliente General"
+        
+        # Validate completed fields one more time
+        if clasificacion == "gasto":
+            missing_fields, validation_error = validate_expense_fields(api_response)
+            if missing_fields:
+                await message.answer(validation_error)
+                return
+        elif clasificacion == "ingreso":
+            missing_fields, validation_error = validate_revenue_fields(api_response)
+            if missing_fields:
+                await message.answer(validation_error)
+                return
+
+        # Validar contexto de la transacción
+        from services.api_service import get_valid_token_for_chat, get_selected_farm_id
+        
+        chat_session_id = message.chat.id
+        token = await get_valid_token_for_chat(chat_session_id)
+        farm_id = await get_selected_farm_id(chat_session_id)
+        
+        context_valid, context_error = validate_transaction_context(chat_session_id, farm_id, token)
+        if not context_valid:
+            await message.answer(context_error)
+            return
+        
+        # Check if validation is enabled for this user
+        validation_enabled = get_validation_enabled(user_id)
+        
+        if validation_enabled:
+            # Show confirmation message if validation is enabled
+            await show_confirmation_message(message, respuesta, api_response, clasificacion)
+        else:
+            # Process transaction directly if validation is disabled
+            await process_transaction_directly(message, respuesta, api_response, clasificacion)
+
+
+async def request_next_missing_field(message: Message, user_id: int, field_name: str):
+    """Request the next missing field from the user."""
+    # Create inline keyboard with cancel button
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
+    ])
+    
+    field_messages = {
+        "value": "💰 Por favor, ingresa el valor/monto de la transacción:",
+        "note": "📝 Por favor, proporciona una descripción de la transacción:",
+        "type": "📂 Por favor, indica el tipo de transacción:",
+        "crop_variety": "🌱 Por favor, especifica la variedad de cultivo:",
+        "customer": "👤 Por favor, indica el nombre del cliente:"
+    }
+    
+    message_text = field_messages.get(field_name, f"Por favor, proporciona el campo: {field_name}")
+    await message.answer(message_text, reply_markup=keyboard)
+
+
+async def process_new_message(message: Message, user_input: str, selected_farm, user_id: int):
+    """Process a new message with AI and validate fields."""
     # Mostrar escritura mientras se obtienen datos y se procesa la IA
     async with show_typing(message):
         chat_session_id = message.chat.id
@@ -161,7 +210,6 @@ async def handle_regular_message(message: Message):
             return
 
         crop_varieties = await request_crop_varieties(chat_session_id)
-        
         if crop_varieties is None or len(crop_varieties) < 1:
             await message.answer("Hubo un error en el servidor obteniendo variedades de cultivos, intentalo mas tarde.")
             return
@@ -169,151 +217,58 @@ async def handle_regular_message(message: Message):
         # Consultar el modelo de IA
         response_text = await query_ai_model(user_input, expense_type, revenue_type, crop_varieties)
 
-    # Procesar la respuesta (sin necesidad de escribir aquí ya que es rápido)
+    # Procesar la respuesta de la IA
     try:
         data = json.loads(response_text)
-
         clasificacion = data.get("clasificacion")
         respuesta = data.get("respuesta")
         api_response = data.get("respuesta_api", {
             "note": "", "value": "", "type": "", "date": "", "crop_variety": "", "customer": ""
         })
 
-        # ADD FARM ID TO API RESPONSE - Add this line right after getting api_response
+        # ADD FARM ID TO API RESPONSE
         api_response["farm_id"] = selected_farm.litefarm_farm_id
 
-        # When an expense is detected, show available expense types
-        # What it does: Based on the list of expense types, it formats them for user display.
-        # This will also show the selected expense type if it exists in the response.
-        if clasificacion == "gasto":
-            # Format expense types for user display
-            expense_options = []
-            if expense_type:
-                for item in expense_type:
-                    if isinstance(item, dict):
-                        expense_id = item.get('expense_type_id', '')
-                        name = item.get('expense_name', '')
-                        if expense_id and name:
-                            expense_options.append(f"• {name}")
-
-            # If there are expense options, include them in the response
-            if expense_options and api_response.get("type"):
-                selected_type = api_response.get("type")
-                selected_name = ""
-
-                # Find the name of the selected expense type
-                for item in expense_type:
-                    if isinstance(item, dict) and str(item.get('expense_type_id', '')) == str(selected_type):
-                        selected_name = item.get('expense_name', '')
-                        break
-
-                if not selected_name and selected_type:
-                    # If we couldn't find the ID in the list, maybe the AI sent the name directly
-                    selected_name = selected_type
-
-                # Get the transaction details for display
-                note = api_response.get("note", "")
-                value = api_response.get("value", "")
-                transaction_date = format_date_for_display(api_response.get("date", ""))
-                formatted_value = format_currency_value(value)
-
-                # INCLUDE FARM NAME IN RESPONSE MESSAGE - Update response to include farm info
-                respuesta = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} en la granja **{selected_farm.name}** 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
-            else:
-                respuesta = "No pude identificar un tipo de gasto específico. Por favor, asegúrate de que el mensaje incluya un tipo de gasto válido.\n\n" + respuesta
-
-        # Handle revenue classification
-        elif clasificacion == "ingreso":
-            # Validate revenue type
-            is_valid_revenue, revenue_name, revenue_error = validate_revenue_type(api_response, revenue_type)
-            
-            if not is_valid_revenue:
-                await message.answer(revenue_error)
-                return
-            
-            # Check if it's a crop sale and validate crop variety
-            selected_crop_name = revenue_name  # Default to revenue type name
-            
-            if revenue_name.strip().lower() == "crop sale":
-                is_valid_crop, crop_name, crop_error = validate_crop_variety(api_response, crop_varieties)
-                
-                if not is_valid_crop:
-                    await message.answer(crop_error)
-                    return
-                
-                selected_crop_name = crop_name
-
-            # Handle customer field - set default if empty
-            customer_name = api_response.get("customer", "").strip()
-            if not customer_name:
-                api_response["customer"] = "Cliente General"
-                customer_name = "Cliente General"
-
-            # Format transaction details
-            note = api_response.get("note", "")
-            value = api_response.get("value", "")
-            transaction_date = format_date_for_display(api_response.get("date", ""))
-            formatted_value = format_currency_value(value)
-            
-            # INCLUDE FARM NAME IN RESPONSE MESSAGE - Update response to include farm info
-            respuesta = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} en la granja **{selected_farm.name}** 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
-
-        # Handle non-related classification
-        elif clasificacion == "no_relacionado":
+        # Handle different classifications
+        if clasificacion == "no_relacionado":
             respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles y ejemplos de uso."
             await message.answer(respuesta)
-            return  # Salir sin completar datos
+            return
 
-        # Verificar campos requeridos usando las funciones del validador
+        # Validate API response types and generate user-friendly messages
+        if clasificacion == "gasto":
+            await process_expense_classification(message, api_response, expense_type, selected_farm, respuesta)
+        elif clasificacion == "ingreso":
+            await process_revenue_classification(message, api_response, revenue_type, crop_varieties, selected_farm, respuesta)
+        
+        # STEP 4: Verificar campos requeridos y manejar campos faltantes
+        missing_fields = []
+        validation_error = ""
+        
         if clasificacion == "gasto":
             missing_fields, validation_error = validate_expense_fields(api_response)
-            if missing_fields:
-                await message.answer(validation_error)
-                return
-                
-            # Validar que el tipo de gasto existe
-            if expense_type:
+            # También validar que el tipo de gasto existe
+            if not missing_fields and expense_type:
                 is_valid_expense, expense_name, expense_error = validate_expense_type(api_response, expense_type)
                 if not is_valid_expense:
                     await message.answer(expense_error)
                     return
-                
         elif clasificacion == "ingreso":
             missing_fields, validation_error = validate_revenue_fields(api_response)
-            if missing_fields:
-                await message.answer(validation_error)
-                return
 
-        # Validar contexto de la transacción (token, farm_id, etc.)
-        from services.api_service import get_valid_token_for_chat, get_selected_farm_id
-        
-        chat_session_id = message.chat.id
-        token = await get_valid_token_for_chat(chat_session_id)
-        farm_id = await get_selected_farm_id(chat_session_id)
-        
-        context_valid, context_error = validate_transaction_context(chat_session_id, farm_id, token)
-        if not context_valid:
-            await message.answer(context_error)
+        # Si faltan campos, solicitar el primero y guardar estado
+        if missing_fields:
+            user_states[user_id] = {
+                "missing_fields": missing_fields,
+                "api_response": api_response,
+                "respuesta": respuesta,
+                "clasificacion": clasificacion,
+            }
+            await request_next_missing_field(message, user_id, missing_fields[0])
             return
 
-        # Apply default customer if empty for revenue
-        if clasificacion == "ingreso" and not api_response.get("customer"):
-            api_response["customer"] = "Cliente General"
-
-        # Process final transaction
-        async with show_typing(message):
-            await handle_api_transaction(api_response, clasificacion, message)
-
-        # Check if validation is enabled for this user
-        user_id = message.from_user.id
-        validation_enabled = get_validation_enabled(user_id)
-        
-        if validation_enabled:
-            # Show confirmation message if validation is enabled
-            await show_confirmation_message(message, respuesta, api_response, clasificacion)
-        else:
-            # Process transaction directly if validation is disabled
-            await process_transaction_directly(message, respuesta, api_response, clasificacion)
+        # Si todos los campos están completos, validar contexto y procesar
+        await finalize_transaction(message, api_response, clasificacion, respuesta, user_id)
 
     except json.JSONDecodeError:
         logging.warning("Respuesta del modelo no tiene formato JSON válido. Respuesta recibida: %s", response_text)
@@ -321,6 +276,94 @@ async def handle_regular_message(message: Message):
             "❌ Lo siento, no entendí tu mensaje o hubo un error procesando la respuesta. "
             "Por favor, intenta reformular tu mensaje o usa /help para ver ejemplos de uso."
         )
+
+
+async def process_expense_classification(message: Message, api_response: dict, expense_type: list, selected_farm, respuesta: str):
+    """Process expense classification and update response message."""
+    if expense_type and api_response.get("type"):
+        selected_type = api_response.get("type")
+        selected_name = ""
+
+        # Find the name of the selected expense type
+        for item in expense_type:
+            if isinstance(item, dict) and str(item.get('expense_type_id', '')) == str(selected_type):
+                selected_name = item.get('expense_name', '')
+                break
+
+        if not selected_name and selected_type:
+            selected_name = selected_type
+
+        # Update response with transaction details
+        note = api_response.get("note", "")
+        value = api_response.get("value", "")
+        transaction_date = format_date_for_display(api_response.get("date", ""))
+        formatted_value = format_currency_value(value)
+
+        api_response["formatted_response"] = f"Seleccioné este tipo: {selected_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como gasto de {selected_name.lower()} en la granja **{selected_farm.name}** 🚜💸. Si tienes más gastos o ingresos para registrar, avísame."
+
+
+async def process_revenue_classification(message: Message, api_response: dict, revenue_type: list, crop_varieties: list, selected_farm, respuesta: str):
+    """Process revenue classification and update response message."""
+    # Validate revenue type
+    is_valid_revenue, revenue_name, revenue_error = validate_revenue_type(api_response, revenue_type)
+    if not is_valid_revenue:
+        await message.answer(revenue_error)
+        return
+
+    # Check if it's a crop sale and validate crop variety
+    selected_crop_name = revenue_name
+    if revenue_name.strip().lower() == "crop sale":
+        is_valid_crop, crop_name, crop_error = validate_crop_variety(api_response, crop_varieties)
+        if not is_valid_crop:
+            await message.answer(crop_error)
+            return
+        selected_crop_name = crop_name
+
+    # Handle customer field - set default if empty
+    customer_name = api_response.get("customer", "").strip()
+    if not customer_name:
+        api_response["customer"] = "Cliente General"
+        customer_name = "Cliente General"
+
+    # Update response with transaction details
+    note = api_response.get("note", "")
+    value = api_response.get("value", "")
+    transaction_date = format_date_for_display(api_response.get("date", ""))
+    formatted_value = format_currency_value(value)
+    
+    api_response["formatted_response"] = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} en la granja **{selected_farm.name}** 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
+
+
+async def finalize_transaction(message: Message, api_response: dict, clasificacion: str, respuesta: str, user_id: int):
+    """Finalize transaction after all validations pass."""
+    # Validar contexto de la transacción
+    from services.api_service import get_valid_token_for_chat, get_selected_farm_id
+    
+    chat_session_id = message.chat.id
+    token = await get_valid_token_for_chat(chat_session_id)
+    farm_id = await get_selected_farm_id(chat_session_id)
+    
+    context_valid, context_error = validate_transaction_context(chat_session_id, farm_id, token)
+    if not context_valid:
+        await message.answer(context_error)
+        return
+
+    # Apply default customer if empty for revenue
+    if clasificacion == "ingreso" and not api_response.get("customer"):
+        api_response["customer"] = "Cliente General"
+
+    # Use formatted response if available
+    final_respuesta = api_response.get("formatted_response", respuesta)
+    
+    # Check if validation is enabled for this user
+    validation_enabled = get_validation_enabled(user_id)
+    
+    if validation_enabled:
+        # Show confirmation message if validation is enabled
+        await show_confirmation_message(message, final_respuesta, api_response, clasificacion)
+    else:
+        # Process transaction directly if validation is disabled
+        await process_transaction_directly(message, final_respuesta, api_response, clasificacion)
 
 async def process_transaction_directly(message: Message, transaction_details: str, api_response: dict, clasificacion: str):
     """
