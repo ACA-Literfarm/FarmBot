@@ -7,6 +7,14 @@ from services.ai_service import query_ai_model
 from services.api_service import handle_api_transaction, request_expense_types, request_revenue_types, request_crop_varieties
 from services.typing_context import show_typing
 from commands.disable_validation import get_validation_enabled
+from middleware.fields_validator import (
+    validate_expense_fields, 
+    validate_revenue_fields, 
+    validate_revenue_type, 
+    validate_crop_variety,
+    validate_expense_type,
+    validate_transaction_context
+)
 from shared.DTO.farm.farm_dto import FarmDTO
 from shared.services.farm_selection_service import FarmSelectionService
 from shared.repositories.farm_repository import FarmRepository
@@ -46,92 +54,6 @@ def format_date_for_display(date_str: str) -> str:
     except ValueError:
         # If invalid date format, use today's date as fallback
         return date.today().strftime("%d/%m/%Y")
-
-def validate_revenue_type(api_response: dict, revenue_types: list) -> tuple[bool, str, str]:
-    """
-    Validate if the revenue type exists in the available revenue types.
-    
-    Returns:
-        tuple: (is_valid, revenue_type_name, error_message)
-    """
-    selected_revenue_type = api_response.get("type", "")
-    
-    # Convert to string and strip if it's not already a string
-    if isinstance(selected_revenue_type, (int, float)):
-        selected_revenue_type = str(selected_revenue_type)
-    else:
-        selected_revenue_type = str(selected_revenue_type).strip()
-    
-    available_revenue_types = [f"ID: {item.get('revenue_type_id')} - {item.get('revenue_name')}" for item in revenue_types if isinstance(item, dict)]
-    
-    # Find the revenue type by ID
-    for item in revenue_types:
-        if isinstance(item, dict) and str(item.get('revenue_type_id', '')) == str(selected_revenue_type):
-            return True, item.get('revenue_name', ''), ""
-    
-    # If not found, create error message with available options
-    revenue_options = [
-        f"• {item.get('revenue_name', '')}" 
-        for item in revenue_types 
-        if isinstance(item, dict) and item.get('revenue_name')
-    ]
-    
-    error_msg = (
-        "No pude identificar un tipo de ingreso específico. "
-        "Por favor, asegúrate de que el mensaje incluya un tipo de ingreso válido.\n\n"
-        f"Tipos de ingresos disponibles:\n{chr(10).join(revenue_options)}"
-    )
-    
-    return False, "", error_msg
-
-def validate_crop_variety(api_response: dict, crop_varieties: list) -> tuple[bool, str, str]:
-    """
-    Validate if the crop variety exists in the available crop varieties.
-    
-    Returns:
-        tuple: (is_valid, crop_variety_name, error_message)
-    """
-    crop_variety_id = api_response.get("crop_variety", "")
-    
-    # Enhanced logging for debugging
-    available_varieties = [f"ID: {item.get('crop_variety_id')} - {item.get('crop_variety_name')}" for item in crop_varieties if isinstance(item, dict)]
-    
-    if not crop_variety_id:
-        # Create available crop varieties list for error message
-        crop_variety_list = "\n".join(
-            f"• {item.get('crop_variety_name', '')}"
-            for item in crop_varieties 
-            if isinstance(item, dict) and item.get('crop_variety_name')
-        )
-        
-        error_msg = (
-            "No pude identificar una variedad de cultivo disponible en tu granja. "
-            "Por favor, asegúrate de que el mensaje incluya una variedad de cultivo válida.\n\n"
-            f"Variedades de cultivo disponibles:\n{crop_variety_list}"
-        )
-        
-        return False, "", error_msg
-    
-    # Find the crop variety by ID
-    for item in crop_varieties:
-        if isinstance(item, dict) and str(item.get('crop_variety_id', '')) == str(crop_variety_id):
-            crop_name = item.get('crop_variety_name', '')
-            return True, f"Venta de {crop_name}", ""
-    
-    # If crop variety ID not found in list
-    crop_variety_list = "\n".join(
-        f"• {item.get('crop_variety_name', '')}"
-        for item in crop_varieties 
-        if isinstance(item, dict) and item.get('crop_variety_name')
-    )
-    
-    error_msg = (
-        "No pude identificar una variedad de cultivo específica para la venta. "
-        "Por favor, asegúrate de que el mensaje incluya una variedad de cultivo válida.\n\n"
-        f"Variedades de cultivo disponibles:\n{crop_variety_list}"
-    )
-    
-    return False, "", error_msg
 
 def format_currency_value(value: str) -> str:
     """Format currency value for display."""
@@ -342,46 +264,36 @@ async def handle_regular_message(message: Message):
             await message.answer(respuesta)
             return  # Salir sin completar datos
 
-        # Verificar si faltan campos en la respuesta de la IA
-        missing_fields = []
-        if not api_response.get("note"):
-            missing_fields.append("note")
-        if not api_response.get("value"):
-            missing_fields.append("value")
-        if not api_response.get("type"):
-            missing_fields.append("type")
-        # Note: date is optional, if not provided we'll use today's date
+        # Verificar campos requeridos usando las funciones del validador
+        if clasificacion == "gasto":
+            missing_fields, validation_error = validate_expense_fields(api_response)
+            if missing_fields:
+                await message.answer(validation_error)
+                return
+                
+            # Validar que el tipo de gasto existe
+            if expense_type:
+                is_valid_expense, expense_name, expense_error = validate_expense_type(api_response, expense_type)
+                if not is_valid_expense:
+                    await message.answer(expense_error)
+                    return
+                
+        elif clasificacion == "ingreso":
+            missing_fields, validation_error = validate_revenue_fields(api_response)
+            if missing_fields:
+                await message.answer(validation_error)
+                return
 
-        if missing_fields:
-            # Guardar el estado del usuario
-            user_states[user_id] = {
-                "missing_fields": missing_fields,
-                "api_response": api_response,  # This already includes farm_id
-                "respuesta": respuesta,
-                "clasificacion": clasificacion,
-            }
-            
-            # Create inline keyboard with cancel button
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
-            ])
-            
-            first_missing_field = missing_fields[0]
-            if first_missing_field == "value":
-                await message.answer(
-                    "💰 Faltó el precio de la transacción. Por favor, ingrésalo:",
-                    reply_markup=keyboard
-                )
-            elif first_missing_field == "note":
-                await message.answer(
-                    "📝 Faltó la descripción de la transacción. Por favor, proporciónala:",
-                    reply_markup=keyboard
-                )
-            elif first_missing_field == "type":
-                await message.answer(
-                    "📂 Faltó el tipo de transacción. Por favor, indícalo (por ejemplo: gasolina, maquinaria, plantas, otro):",
-                    reply_markup=keyboard
-                )
+        # Validar contexto de la transacción (token, farm_id, etc.)
+        from services.api_service import get_valid_token_for_chat, get_selected_farm_id
+        
+        chat_session_id = message.chat.id
+        token = await get_valid_token_for_chat(chat_session_id)
+        farm_id = await get_selected_farm_id(chat_session_id)
+        
+        context_valid, context_error = validate_transaction_context(chat_session_id, farm_id, token)
+        if not context_valid:
+            await message.answer(context_error)
             return
 
         # Apply default customer if empty for revenue
