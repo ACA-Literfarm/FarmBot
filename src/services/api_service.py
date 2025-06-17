@@ -53,6 +53,10 @@ async def get_valid_token_for_chat(telegram_chat_id: int):
             return None
     except Exception as e:
         return None
+    
+def format_iso_date(date_str):
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    return dt.strftime("%Y-%m-%dT06:00:00.000Z")
 
 async def handle_api_transaction(api_response: dict, clasificacion: str, message: Message) -> None:
     """
@@ -121,7 +125,7 @@ async def register_expense(
     }
 
     payload = [{
-        "expense_date": datetime.strptime(expense_date, "%Y-%m-%d").isoformat() + "Z",
+        "expense_date": format_iso_date(expense_date),
         "expense_type_id": expense_type_id,
         "farm_id": farm_id,
         "note": note,
