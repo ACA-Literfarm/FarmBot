@@ -125,6 +125,8 @@ async def register_expense(
         "value": float(value)
     }]
 
+    logging.info(payload);
+
     try:
         response = requests.post(
             f"{config.URL_LITEFARM}/expense/farm/{farm_id}",

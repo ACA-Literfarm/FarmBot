@@ -225,6 +225,7 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
         api_response = data.get("respuesta_api", {
             "note": "", "value": "", "type": "", "date": "", "crop_variety": "", "customer": ""
         })
+        logging.info(api_response);
 
         # ADD FARM ID TO API RESPONSE
         api_response["farm_id"] = selected_farm.litefarm_farm_id

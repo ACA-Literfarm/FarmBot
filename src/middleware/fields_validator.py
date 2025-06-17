@@ -5,6 +5,7 @@ based on the API requirements in api_service.py.
 """
 
 from typing import Tuple, List, Dict, Any
+from datetime import date
 import logging
 
 
@@ -29,6 +30,10 @@ def validate_expense_fields(api_response: dict) -> Tuple[List[str], str]:
         missing_fields.append("value")
     if not api_response.get("type"):
         missing_fields.append("type")
+    
+    # Set current date if "date" field is missing or empty
+    if not api_response.get("date"):
+        api_response["date"] = date.today().strftime("%Y-%m-%d")
     
     error_message = ""
     if missing_fields:
@@ -72,6 +77,10 @@ def validate_revenue_fields(api_response: dict) -> Tuple[List[str], str]:
     revenue_type = api_response.get("type", "")
     if str(revenue_type) == "1" and not api_response.get("crop_variety"):
         missing_fields.append("crop_variety")
+    
+    # Set current date if "date" field is missing or empty
+    if not api_response.get("date"):
+        api_response["date"] = date.today().strftime("%Y-%m-%d")
     
     error_message = ""
     if missing_fields:
