@@ -24,6 +24,7 @@ from shared.db.session import AsyncSessionLocal
 from shared.db.models.farm import Farm
 from typing import Optional
 import logging
+import re
 logging.basicConfig(level=logging.INFO)
 loggger = logging.getLogger(__name__)
 
@@ -34,6 +35,80 @@ farm_service = FarmSelectionService(
 
 # Diccionario para rastrear el estado del usuario
 user_states = {}
+
+def is_greeting_message(text: str) -> bool:
+    """
+    Check if the message is a greeting message.
+    
+    Args:
+        text: The message text to check
+        
+    Returns:
+        True if the message is a greeting, False otherwise
+    """
+    if not text:
+        return False
+    
+    # Convert to lowercase for case-insensitive matching
+    text_lower = text.lower().strip()
+    
+    # Common greeting patterns in Spanish
+    greeting_patterns = [
+        r'^hola\b',
+        r'^buenos\s+(días|dias|tardes|noches)\b',
+        r'^buen\s+(día|dia|tarde|noche)\b',
+        r'^saludos\b',
+        r'^qué\s+tal\b',
+        r'^como\s+estás\b',
+        r'^cómo\s+estás\b',
+        r'^que\s+tal\b',
+        r'^hey\b',
+        r'^hi\b',
+        r'^hello\b',
+        r'^good\s+(morning|afternoon|evening)\b',
+        r'^how\s+are\s+you\b',
+        r'^what\'s\s+up\b',
+        r'^whats\s+up\b',
+        r'^sup\b',
+        r'^yo\b',
+        r'^epa\b',
+        r'^che\b'
+    ]
+    
+    # Check if any greeting pattern matches
+    for pattern in greeting_patterns:
+        if re.search(pattern, text_lower):
+            return True
+    
+    return False
+
+def get_greeting_response() -> str:
+    """
+    Get a friendly greeting response explaining what the bot does.
+    
+    Returns:
+        A greeting message explaining the bot's functionality
+    """
+    return """👋 ¡Hola! Soy tu asistente financiero agrícola 🤖
+
+Te ayudo a gestionar las finanzas de tu granja de manera fácil y rápida. Puedo ayudarte con:
+
+💰 **Registro de Gastos**: Fertilizantes, pesticidas, herramientas, mano de obra, etc.
+💵 **Registro de Ingresos**: Ventas de cultivos, servicios agrícolas, etc.
+📊 **Seguimiento**: Mantengo un registro organizado de todas tus transacciones
+
+**¿Cómo funciona?**
+Simplemente dime qué gasto o ingreso quieres registrar. Por ejemplo:
+• "Compré fertilizante por $50"
+• "Vendí tomates por $200 a Juan"
+• "Pagué $100 por mano de obra"
+
+**Comandos útiles:**
+/selectfarm - Seleccionar granja
+/currentfarm - Ver granja actual
+/help - Ver todos los comandos
+
+¡Estoy listo para ayudarte! ¿Qué transacción quieres registrar hoy? 😊"""
 
 def format_date_for_display(date_str: str) -> str:
     """
@@ -85,7 +160,12 @@ async def handle_regular_message(message: Message):
         await message.answer("❌ No se pudo identificar el chat. Por favor, intenta nuevamente.")
         return
 
-    # Check if there is a selected farm
+    # STEP 0: Check if this is a greeting message first
+    if is_greeting_message(user_input):
+        await message.answer(get_greeting_response())
+        return
+
+    # STEP 1: Check if there is a selected farm
     selected_farm = await fetch_selected_farm_if_exists(chat_id=chat_id)
     if not selected_farm:
         await message.answer(
@@ -93,17 +173,17 @@ async def handle_regular_message(message: Message):
         )
         return
 
-    # STEP 1: Verificar si el usuario está completando campos faltantes
+    # STEP 2: Verificar si el usuario está completando campos faltantes
     if user_id in user_states and user_states[user_id].get("missing_fields"):
         await handle_missing_field_completion(message, user_id, user_input, selected_farm)
         return
 
-    # STEP 2: Si no hay estado previo, procesar el mensaje normalmente
+    # STEP 3: Si no hay estado previo, procesar el mensaje normalmente
     if not user_input:
         await message.answer("⚠️ El mensaje está vacío. Por favor, escribe algo para que pueda ayudarte.")
         return
 
-    # STEP 3: Procesar mensaje con IA y validar campos
+    # STEP 4: Procesar mensaje con IA y validar campos
     try:
         await process_new_message(message, user_input, selected_farm, user_id)
     except Exception as e:
@@ -255,17 +335,9 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
             respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles y ejemplos de uso."
             await message.answer(respuesta)
             return
-
-        # Check if this is a sale and crop varieties are needed but not available
-        if clasificacion == "ingreso" and (crop_varieties is None or len(crop_varieties) < 1):
-            await message.answer(
-                "🌱 **Para registrar ventas de cultivos, necesitas tener cultivos registrados en tu granja.**\n\n"
-                "📝 **Por favor:**\n"
-                "1. Ve a tu página de LiteFarm\n"
-                "2. Registra al menos un cultivo en tu granja\n"
-                "3. Vuelve aquí para registrar la venta\n\n"
-                "💡 Una vez que tengas cultivos registrados, podrás registrar ventas sin problemas."
-            )
+        
+        if clasificacion == "saludo":
+            await message.answer(respuesta)
             return
 
         # Validate API response types and generate user-friendly messages
@@ -288,6 +360,18 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
                     return
         elif clasificacion == "ingreso":
             missing_fields, validation_error = validate_revenue_fields(api_response)
+            
+            # Check if this is a crop sale and crop varieties are needed but not available
+            if "crop_variety" in missing_fields and (crop_varieties is None or len(crop_varieties) < 1):
+                await message.answer(
+                    "🌱 **Para registrar ventas de cultivos, necesitas tener cultivos registrados en tu granja.**\n\n"
+                    "📝 **Por favor:**\n"
+                    "1. Ve a tu página de LiteFarm\n"
+                    "2. Registra al menos un cultivo en tu granja\n"
+                    "3. Vuelve aquí para registrar la venta\n\n"
+                    "💡 Una vez que tengas cultivos registrados, podrás registrar ventas sin problemas."
+                )
+                return
 
         # Si faltan campos, solicitar el primero y guardar estado
         if missing_fields:
