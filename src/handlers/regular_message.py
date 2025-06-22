@@ -13,7 +13,8 @@ from middleware.fields_validator import (
     validate_revenue_type, 
     validate_crop_variety,
     validate_expense_type,
-    validate_transaction_context
+    validate_transaction_context,
+    validate_field
 )
 from shared.DTO.farm.farm_dto import FarmDTO
 from shared.services.farm_selection_service import FarmSelectionService
@@ -115,60 +116,79 @@ async def handle_regular_message(message: Message):
 async def handle_missing_field_completion(message: Message, user_id: int, user_input: str, selected_farm):
     """Handle completion of missing fields by the user."""
     state = user_states[user_id]
-    missing_field = state["missing_fields"].pop(0)  # Obtener el siguiente campo faltante
-    state["api_response"][missing_field] = user_input  # Guardar el valor proporcionado
-    logging.info(f"User {user_id} provided value for missing field '{missing_field}': {user_input}")
+    missing_field = state["missing_fields"].pop(0)  # Get the next missing field
 
-    # Si aún faltan campos, solicitar el siguiente
+    # Validate the user's input for the specific field
+    is_valid, error_message = validate_field(missing_field, user_input)
+
+    if not is_valid:
+        # If invalid, re-add the field to the front of the list and ask again
+        state["missing_fields"].insert(0, missing_field)
+        await message.answer(error_message)
+        await request_next_missing_field(message, user_id, missing_field)
+        return
+
+    # If valid, save the value
+    state["api_response"][missing_field] = user_input
+    logging.info(f"User {user_id} provided valid value for missing field '{missing_field}': {user_input}")
+
+    # If there are still missing fields, request the next one
     if state["missing_fields"]:
         await request_next_missing_field(message, user_id, state["missing_fields"][0])
         return
     else:
-        # Todos los campos están completos, procesar transacción
+        # All fields are complete, process the transaction
         api_response = state["api_response"]
         clasificacion = state.get("clasificacion", "")
         respuesta = state["respuesta"]
-        
+
         # ADD FARM ID TO API RESPONSE
         api_response["farm_id"] = selected_farm.litefarm_farm_id
-        
-        # Clear user state
-        del user_states[user_id]
-        
+
         # Apply default customer if empty for revenue
         if clasificacion == "ingreso" and not api_response.get("customer"):
             api_response["customer"] = "Cliente General"
-        
-        # Validate completed fields one more time
+
+        # Final validation of all completed fields
         if clasificacion == "gasto":
             missing_fields, validation_error = validate_expense_fields(api_response)
-            if missing_fields:
-                await message.answer(validation_error)
-                return
         elif clasificacion == "ingreso":
             missing_fields, validation_error = validate_revenue_fields(api_response)
-            if missing_fields:
-                await message.answer(validation_error)
-                return
+        else:
+            missing_fields, validation_error = [], ""
 
-        # Validar contexto de la transacción
+        if missing_fields:
+            # This should ideally not happen if per-field validation is robust, but as a fallback
+            await message.answer(f"Hubo un problema con los datos finales. {validation_error}")
+            # We don't delete the state here, so the user can try to fix it, maybe by restarting the command.
+            # Or we could re-initiate the missing fields flow. For now, we stop.
+            del user_states[user_id] # Or handle this case more gracefully
+            return
+
+        # Validate transaction context
         from services.api_service import get_valid_token_for_chat, get_selected_farm_id
         
         chat_session_id = message.chat.id
         token = await get_valid_token_for_chat(chat_session_id)
         farm_id = await get_selected_farm_id(chat_session_id)
         
-        context_valid, context_error = validate_transaction_context(chat_session_id, farm_id, token)
+        context_valid, context_error = validate_transaction_context(
+            chat_session_id, farm_id, str(token) if token is not None else ""
+        )
         if not context_valid:
             await message.answer(context_error)
+            del user_states[user_id] # Clean up state on context error
             return
         
         # Check if validation is enabled for this user
         validation_enabled = get_validation_enabled(user_id)
+
+        # Clear user state *before* final processing
+        del user_states[user_id]
         
         if validation_enabled:
             # Show confirmation message if validation is enabled
-            await show_confirmation_message(message, respuesta, api_response, clasificacion)
+            await show_confirmation_message(message, respuesta, api_response, clasificacion, user_id)
         else:
             # Process transaction directly if validation is disabled
             await process_transaction_directly(message, respuesta, api_response, clasificacion)
@@ -212,13 +232,11 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
             await message.answer("Hubo un error en el servidor obteniendo tipos de ingresos, intentalo mas tarde.")
             return
 
+        # Get crop varieties but don't fail immediately if empty
         crop_varieties = await request_crop_varieties(chat_session_id)
-        if crop_varieties is None or len(crop_varieties) < 1:
-            await message.answer("Hubo un error en el servidor obteniendo variedades de cultivos, intentalo mas tarde.")
-            return
 
         # Consultar el modelo de IA
-        response_text = await query_ai_model(user_input, expense_type, revenue_type, crop_varieties)
+        response_text = await query_ai_model(user_input, expense_type, revenue_type, crop_varieties or [])
 
     # Procesar la respuesta de la IA
     try:
@@ -238,11 +256,23 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
             await message.answer(respuesta)
             return
 
+        # Check if this is a sale and crop varieties are needed but not available
+        if clasificacion == "ingreso" and (crop_varieties is None or len(crop_varieties) < 1):
+            await message.answer(
+                "🌱 **Para registrar ventas de cultivos, necesitas tener cultivos registrados en tu granja.**\n\n"
+                "📝 **Por favor:**\n"
+                "1. Ve a tu página de LiteFarm\n"
+                "2. Registra al menos un cultivo en tu granja\n"
+                "3. Vuelve aquí para registrar la venta\n\n"
+                "💡 Una vez que tengas cultivos registrados, podrás registrar ventas sin problemas."
+            )
+            return
+
         # Validate API response types and generate user-friendly messages
         if clasificacion == "gasto":
             await process_expense_classification(message, api_response, expense_type, selected_farm, respuesta)
         elif clasificacion == "ingreso":
-            await process_revenue_classification(message, api_response, revenue_type, crop_varieties, selected_farm, respuesta)
+            await process_revenue_classification(message, api_response, revenue_type, crop_varieties or [], selected_farm, respuesta)
         
         # STEP 4: Verificar campos requeridos y manejar campos faltantes
         missing_fields = []
@@ -346,7 +376,9 @@ async def finalize_transaction(message: Message, api_response: dict, clasificaci
     token = await get_valid_token_for_chat(chat_session_id)
     farm_id = await get_selected_farm_id(chat_session_id)
     
-    context_valid, context_error = validate_transaction_context(chat_session_id, farm_id, token)
+    context_valid, context_error = validate_transaction_context(
+        chat_session_id, farm_id, str(token) if token is not None else ""
+    )
     if not context_valid:
         await message.answer(context_error)
         return
@@ -363,7 +395,7 @@ async def finalize_transaction(message: Message, api_response: dict, clasificaci
     
     if validation_enabled:
         # Show confirmation message if validation is enabled
-        await show_confirmation_message(message, final_respuesta, api_response, clasificacion)
+        await show_confirmation_message(message, final_respuesta, api_response, clasificacion, user_id)
     else:
         # Process transaction directly if validation is disabled
         await process_transaction_directly(message, final_respuesta, api_response, clasificacion)
@@ -379,11 +411,7 @@ async def process_transaction_directly(message: Message, transaction_details: st
         
         #TODO: Add logic to handle the response from the API if needed
         # Create success message
-        success_message = transaction_details.replace("Voy a registrar", "¡Listo! He registrado")
-        success_message += "\n\n✅ Transacción registrada exitosamente. Si tienes más gastos o ingresos para registrar, avísame."
-        success_message += "\n\n💡 *Validación deshabilitada* - Para habilitar confirmación usa /habilitar_validacion"
-        
-        await message.answer(success_message);
+        await message.answer(f"✅ Transacción registrada exitosamente:\n\n{transaction_details}")
         
     except Exception as e:
         logging.error(f"Error processing transaction directly: {e}")
@@ -391,28 +419,27 @@ async def process_transaction_directly(message: Message, transaction_details: st
             "❌ Error al procesar la transacción. Por favor, intenta nuevamente."
         )
 
-async def show_confirmation_message(message: Message, transaction_details: str, api_response: dict, clasificacion: str):
+async def show_confirmation_message(message: Message, transaction_details: str, api_response: dict, clasificacion: str, user_id: int):
     """
-    Show confirmation message with inline keyboard buttons.
+    Show confirmation message with options to confirm or cancel.
     """
-    user_id = message.from_user.id
-    
-    # Store transaction data for confirmation
-    user_states[user_id] = {
-        "awaiting_confirmation": True,
-        "api_response": api_response,
-        "clasificacion": clasificacion,
-        "transaction_details": transaction_details
-    }
-    
-    # Create inline keyboard with confirmation buttons
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="✅ Confirmar", callback_data=f"confirm_{user_id}"),
-            InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_{user_id}")
+            InlineKeyboardButton(text="✅ Confirmar", callback_data=f"confirm_transaction_{user_id}"),
+            InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_transaction_{user_id}")
         ]
     ])
     
-    confirmation_text = f"{transaction_details}\n\n¿Estás seguro de realizar la acción?"
+    # Store api_response in user_states for later use
+    if user_id not in user_states:
+        user_states[user_id] = {}
+        
+    user_states[user_id]["confirmation_data"] = {
+        "api_response": api_response,
+        "clasificacion": clasificacion
+    }
     
-    await message.answer(confirmation_text, reply_markup=keyboard)
+    await message.answer(
+        f"⏳ Por favor, confirma los detalles de la transacción:\n\n{transaction_details}",
+        reply_markup=keyboard
+    )

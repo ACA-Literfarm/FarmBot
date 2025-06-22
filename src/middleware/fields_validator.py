@@ -224,3 +224,33 @@ def validate_transaction_context(chat_session_id: int, farm_id: str, token: str)
         return False, error_message
     
     return True, ""
+
+
+def validate_field(field_name: str, value: Any) -> Tuple[bool, str]:
+    """
+    Validate a single field's value based on its name.
+
+    Args:
+        field_name: The name of the field to validate.
+        value: The value of the field to validate.
+
+    Returns:
+        A tuple containing a boolean indicating if the field is valid,
+        and an error message if it's not.
+    """
+    if field_name in ["value", "quantity"]:
+        try:
+            # Remove commas for thousands separators if present
+            if isinstance(value, str):
+                value = value.replace(",", "")
+            float(value)
+        except (ValueError, TypeError):
+            return False, f"❌ El valor para '{field_name}' debe ser un número. Por favor, inténtalo de nuevo."
+
+    if field_name == "note":
+        if not isinstance(value, str) or not value.strip():
+            return False, "❌ La nota no puede estar vacía. Por favor, proporciona una descripción."
+
+    # Add more field-specific validations here if needed
+
+    return True, ""
