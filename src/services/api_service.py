@@ -133,7 +133,6 @@ async def register_expense(
     }]
 
     try:
-        print(payload)
         response = requests.post(
             f"{config.URL_LITEFARM}/expense/farm/{farm_id}",
             headers=headers,
@@ -228,7 +227,6 @@ async def request_expense_types(chat_session_id: int) -> Optional[List[Dict[str,
         }
 
         response = requests.get(f"{config.URL_LITEFARM}/expense_type/all/{farm_id}", headers=headers)
-        print(response.json())
         if response.status_code == 200:
             data = response.json()
             ## Validate if the response contains expected data (list of expense types)
