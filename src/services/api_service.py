@@ -227,7 +227,7 @@ async def request_expense_types(chat_session_id: int) -> Optional[List[Dict[str,
             "Authorization": f"Bearer {token}"
         }
 
-        response = requests.get(f"{config.URL_LITEFARM}/expense_type/farm/all/{farm_id}", headers=headers)
+        response = requests.get(f"{config.URL_LITEFARM}/expense_type/all/{farm_id}", headers=headers)
         print(response.json())
         if response.status_code == 200:
             data = response.json()
