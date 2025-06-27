@@ -52,8 +52,6 @@ Vendí tomates por 100 dólares a Juan Pérez
 | `/selectfarm` | — | Muestra el listado de granjas disponibles y permite seleccionar una. Si solo tienes una se selecciona automáticamente. |
 | `/currentfarm` | — | Indica la granja actualmente seleccionada. |
 | `/clearfarm` | — | Quita la selección de granja (deberás elegir otra antes de registrar transacciones). |
-| `/skip` | — | Omite el campo *cliente* cuando el bot solicite datos adicionales. Solo salta el campo `customer`. |
-| `/cancel` | — | Cancela la transacción en curso y limpia cualquier estado pendiente. |
 | `/deshabilitar_validacion` | — | Desactiva la confirmación previa al registro de transacciones. |
 | `/habilitar_validacion` | — | Activa la confirmación previa al registro de transacciones (opción por defecto). |
 
@@ -113,7 +111,6 @@ Si solo tienes una granja, el bot la seleccionará automáticamente.
 | Problema | Solución recomendada |
 |----------|----------------------|
 | **"❌ No tienes granjas disponibles"** | Crea una granja en LiteFarm y luego usa `/selectfarm`. |
-| **"❌ No hay campos pendientes para completar"** después de `/skip` | No hay datos opcionales que omitir; continúa con el flujo normal. |
 | Error de token o sesión | Ejecuta `/login` nuevamente para renovar la autorización. |
 | El bot no responde | Comprueba tu conexión y vuelve a enviar el comando. |
 
