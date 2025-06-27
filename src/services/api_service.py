@@ -133,6 +133,7 @@ async def register_expense(
     }]
 
     try:
+        print(payload)
         response = requests.post(
             f"{config.URL_LITEFARM}/expense/farm/{farm_id}",
             headers=headers,
@@ -198,9 +199,11 @@ async def register_sale(
         return None
 
 ## Request expense types from LiteFarm API
-async def request_expense_types() -> Optional[List[Dict[str, Any]]]:
+async def request_expense_types(chat_session_id: int) -> Optional[List[Dict[str, Any]]]:
     """
     Request expense types from the LiteFarm API.
+    Args:
+        chat_session_id: Telegram chat ID to get the user's token
     
     Returns:
         List of expense types if successful, None if there was an error
@@ -210,7 +213,22 @@ async def request_expense_types() -> Optional[List[Dict[str, Any]]]:
         return None
         
     try:
-        response = requests.get(f"{config.URL_LITEFARM}/expense_type/all")
+        farm_id = await get_selected_farm_id(chat_session_id);
+        token = await get_valid_token_for_chat(chat_session_id)
+        if not token:
+            logging.error(f"No valid token found for chat_session_id: {chat_session_id}")
+            return None
+        
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept-Language": "en",
+            "farm_id": farm_id,
+            "Authorization": f"Bearer {token}"
+        }
+
+        response = requests.get(f"{config.URL_LITEFARM}/expense_type/farm/all/{farm_id}", headers=headers)
+        print(response.json())
         if response.status_code == 200:
             data = response.json()
             ## Validate if the response contains expected data (list of expense types)
@@ -348,12 +366,15 @@ async def request_crop_varieties(chat_session_id: int) -> Optional[List[Dict[str
 
         response = requests.get(f"{config.URL_LITEFARM}/crop_variety/farm/{farm_id}", headers=headers)
         if response.status_code == 200:
-            data = response.json()
-            ## Validate if the response contains expected data (list of crop varieties)
-            if not data:  # Check if response is empty
-                logging.error("Crop varieties response is empty")
-                return None
-            
+            data = response.json() or []  # Ensure we always return a list
+
+            # It's valid for a farm to have 0 crop varieties configured. In that
+            # scenario we simply return an empty list instead of treating it as
+            # an error so that callers that only care about expense or revenue
+            # types can proceed without unnecessary log noise.
+            if not data:
+                logging.info("Crop varieties response is empty – returning an empty list")
+
             return data
         else:
             logging.error(f"Error fetching crop varieties: {response.status_code}")

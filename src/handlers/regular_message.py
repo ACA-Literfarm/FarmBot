@@ -202,7 +202,7 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
         chat_session_id = message.chat.id
         
         # Solicitar todos los tipos de datos
-        expense_type = await request_expense_types()
+        expense_type = await request_expense_types(chat_session_id)
         if expense_type is None:
             await message.answer("Hubo un error en el servidor obteniendo tipos de gastos, intentalo mas tarde.")
             return
@@ -213,8 +213,11 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
             return
 
         crop_varieties = await request_crop_varieties(chat_session_id)
-        if crop_varieties is None or len(crop_varieties) < 1:
-            await message.answer("Hubo un error en el servidor obteniendo variedades de cultivos, intentalo mas tarde.")
+        # Crop varieties are only required when the user is recording a revenue transaction.
+        # It's possible for a farm to not have any varieties configured yet, so an empty list
+        # shouldn't be treated as a hard error that blocks every interaction.
+        if crop_varieties is None:
+            await message.answer("Hubo un error en el servidor obteniendo variedades de cultivos, inténtalo más tarde.")
             return
 
         # Consultar el modelo de IA
