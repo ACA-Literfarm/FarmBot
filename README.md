@@ -9,22 +9,23 @@ Un chatbot inteligente desarrollado en Python que se integra con LiteFarm a trav
 ## 📋 Índice
 
 1. [Descripción del Proyecto](#-descripción-del-proyecto)
-2. [Arquitectura del Sistema](#-arquitectura-del-sistema)
+2. [Arquitectura del Sistema](#️-arquitectura-del-sistema)
 3. [Componentes Principales](#-componentes-principales)
 4. [Tecnologías Utilizadas](#-tecnologías-utilizadas)
 5. [Estructura del Proyecto](#-estructura-del-proyecto)
-6. [Base de Datos](#-base-de-datos)
-7. [Configuración del Entorno](#-configuración-del-entorno)
+6. [Base de Datos](#️-base-de-datos)
+7. [Configuración del Entorno](#️-configuración-del-entorno)
 8. [Instalación y Despliegue](#-instalación-y-despliegue)
 9. [API y Endpoints](#-api-y-endpoints)
 10. [Comandos del Bot](#-comandos-del-bot)
 11. [Servicios de IA](#-servicios-de-ia)
 12. [Autenticación y Seguridad](#-autenticación-y-seguridad)
-13. [Monitoreo y Logs](#-monitoreo-y-logs)
-14. [Testing](#-testing)
-15. [Migración de Base de Datos](#-migración-de-base-de-datos)
-16. [Solución de Problemas](#-solución-de-problemas)
-17. [Contribución](#-contribución)
+13. [Testing](#-testing)
+14. [Migración de Base de Datos](#-migración-de-base-de-datos)
+15. [Contribución](#-contribución)
+16. [Soporte y Contacto](#-soporte-y-contacto)
+17. [Licencia](#-licencia)
+18. [Referencias y Links Útiles](#-referencias-y-links-útiles)
 
 ---
 
@@ -391,17 +392,37 @@ GET  /api/health         # Estado del servicio
 ### Integración con LiteFarm API
 
 #### Endpoints Utilizados
+
+##### Gestión de Granjas
 ```
-GET  /user/farms         # Obtener granjas del usuario
-POST /expenses           # Crear gastos
-GET  /expense_types      # Tipos de gastos disponibles
+GET  /user_farm/user/{userId}     # Obtener granjas del usuario
 ```
 
-#### Headers Requeridos
+##### Gestión de Gastos
 ```
-Authorization: Bearer {access_token}
-Content-Type: application/json
+POST /expense/farm/{farm_id}      # Registrar gastos en una granja
+GET  /expense_type/all            # Obtener todos los tipos de gastos disponibles
 ```
+
+##### Gestión de Ingresos/Ventas
+```
+POST /sale                        # Registrar ventas/ingresos
+GET  /revenue_type/farm/{farm_id} # Obtener tipos de ingresos por granja
+```
+
+##### Gestión de Cultivos
+```
+GET  /crop_variety/farm/{farm_id} # Obtener variedades de cultivos por granja
+```
+
+#### Códigos de Respuesta
+- **200 OK**: Solicitud exitosa (GET requests)
+- **201 Created**: Recurso creado exitosamente (POST requests)
+- **400 Bad Request**: Datos inválidos en la solicitud
+- **401 Unauthorized**: Token de autenticación inválido o expirado
+- **403 Forbidden**: Sin permisos para acceder al recurso
+- **404 Not Found**: Recurso no encontrado
+- **500 Internal Server Error**: Error del servidor
 
 ---
 
@@ -494,17 +515,6 @@ Responde con el ID de la categoría más apropiada.
 6. Almacenamiento seguro de tokens
 7. Creación de sesión de usuario
 
-#### JWT Tokens
-```python
-# Estructura del token
-{
-    "user_id": "litefarm_user_id",
-    "exp": timestamp,
-    "iat": timestamp,
-    "farms": ["farm_id_1", "farm_id_2"]
-}
-```
-
 ### Seguridad
 
 #### Medidas Implementadas
@@ -523,50 +533,6 @@ FLASK_SECRET_KEY=secret
 GOOGLE_CLIENT_SECRET=secret
 DB_PASSWORD=secret
 ```
-
----
-
-## 📊 Monitoreo y Logs
-
-### Sistema de Logging
-
-#### Configuración
-```python
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('farmbot.log')
-    ]
-)
-```
-
-#### Tipos de Logs
-- **INFO**: Operaciones normales, comandos ejecutados
-- **WARNING**: Situaciones anómalas, APIs lentas
-- **ERROR**: Errores de aplicación, fallos de conexión
-- **CRITICAL**: Errores graves, pérdida de servicios
-
-### Métricas a Monitorear
-
-#### Performance
-- Tiempo de respuesta del bot
-- Latencia de APIs externas
-- Uso de memoria y CPU
-- Conexiones activas a BD
-
-#### Negocio
-- Usuarios activos diarios/mensuales
-- Comandos más utilizados
-- Errores de autenticación
-- Gastos registrados por día
-
-### Herramientas Recomendadas
-- **Prometheus + Grafana**: Métricas y dashboards
-- **ELK Stack**: Agregación y análisis de logs
-- **Sentry**: Tracking de errores
-- **Uptime Robot**: Monitoreo de disponibilidad
 
 ---
 
@@ -683,83 +649,6 @@ def downgrade():
 
 ---
 
-## 🔧 Solución de Problemas
-
-### Problemas Comunes
-
-#### Bot no responde
-```bash
-# Verificar token de Telegram
-curl -X GET "https://api.telegram.org/bot<TOKEN>/getMe"
-
-# Verificar logs
-tail -f farmbot.log
-
-# Verificar variables de entorno
-python3 -c "from src.config import config; config.validate_required_vars()"
-```
-
-#### Error de conexión a BD
-```bash
-# Verificar estado de PostgreSQL
-docker-compose ps db
-
-# Verificar conectividad
-psql -h localhost -p 5432 -U farmbot_user -d farmbot_db
-
-# Reiniciar BD
-docker-compose restart db
-```
-
-#### Error de autenticación OAuth2
-```bash
-# Verificar configuración Google OAuth2
-# - Redirect URIs correctos
-# - Client ID y Secret válidos
-# - APIs habilitadas en Google Console
-```
-
-#### Error de IA Service
-```bash
-# Verificar API key
-curl -H "Authorization: Bearer $AI_API_KEY" https://api.openai.com/v1/models
-
-# Verificar cuota/límites
-# Revisar dashboard del proveedor de IA
-```
-
-### Debugging
-
-#### Modo Debug
-```python
-# En config.py
-DEBUG = True
-logging.basicConfig(level=logging.DEBUG)
-```
-
-#### Herramientas útiles
-```bash
-# Monitorear requests HTTP
-tcpdump -i any port 443
-
-# Analizar uso de memoria
-pip install memory_profiler
-python3 -m memory_profiler src/main.py
-
-# Profile de performance
-pip install line_profiler
-```
-
-### Logs Importantes
-
-#### Ubicaciones de Logs
-- Aplicación principal: `farmbot.log`
-- PostgreSQL: Docker logs
-- Nginx: `/var/log/nginx/`
-- Sistema: `/var/log/syslog`
-
----
-
 ## 🤝 Contribución
 
 ### Guías de Desarrollo
@@ -818,16 +707,11 @@ Tipos: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 - **Discussions**: Para preguntas generales
 - **Wiki**: Información adicional
 
-### Contacto del Equipo
-- **Desarrollo**: [email de desarrollo]
-- **DevOps**: [email de infraestructura]
-- **Product Owner**: [email de producto]
-
 ---
 
 ## 📄 Licencia
 
-Este proyecto está bajo la licencia [TIPO_DE_LICENCIA]. Ver archivo `LICENSE` para más detalles.
+Este proyecto está bajo la licencia GNU GENERAL PUBLIC LICENSE. Ver archivo `LICENSE` para más detalles.
 
 ---
 
