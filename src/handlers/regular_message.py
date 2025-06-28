@@ -22,7 +22,8 @@ from shared.repositories.chat_repository import ChatSessionRepository
 from shared.db.session import AsyncSessionLocal
 from shared.db.models.farm import Farm
 from typing import Optional
-import logging
+from shared.utils.number_utils import extract_numeric
+
 logging.basicConfig(level=logging.INFO)
 loggger = logging.getLogger(__name__)
 
@@ -57,12 +58,17 @@ def format_date_for_display(date_str: str) -> str:
 
 def format_currency_value(value: str) -> str:
     """Format currency value for display."""
+    # Attempt to extract a numeric component first to avoid ValueError when the
+    # input contains additional text such as currency symbols or words.
+    numeric_part = extract_numeric(str(value)) if value else None
+
+    if numeric_part is None:
+        return f"${value}" if value else ""
+
     try:
-        if value:
-            numeric_value = float(value.replace(",", ""))
-            return f"${numeric_value:,.0f}"
-        return ""
-    except (ValueError, AttributeError):
+        numeric_value = float(numeric_part)
+        return f"${numeric_value:,.0f}"
+    except ValueError:
         return f"${value}" if value else ""
 
 async def fetch_selected_farm_if_exists(chat_id: int) -> Optional[FarmDTO]:
@@ -116,7 +122,19 @@ async def handle_missing_field_completion(message: Message, user_id: int, user_i
     """Handle completion of missing fields by the user."""
     state = user_states[user_id]
     missing_field = state["missing_fields"].pop(0)  # Obtener el siguiente campo faltante
-    state["api_response"][missing_field] = user_input  # Guardar el valor proporcionado
+
+    # --- Normalise value field ------------------------------------------- #
+    if missing_field == "value":
+        numeric_part = extract_numeric(user_input)
+        if numeric_part is None:
+            # Reinstate field so the user can try again and prompt for value
+            state["missing_fields"].insert(0, missing_field)
+            await message.answer("❌ No se pudo identificar un número en tu respuesta. Por favor, ingresa solo el monto, por ejemplo: 1000")
+            return
+        state["api_response"][missing_field] = numeric_part
+    else:
+        state["api_response"][missing_field] = user_input  # Guardar el valor proporcionado
+
     logging.info(f"User {user_id} provided value for missing field '{missing_field}': {user_input}")
 
     # Si aún faltan campos, solicitar el siguiente

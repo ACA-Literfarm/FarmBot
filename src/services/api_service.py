@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from shared.repositories.token_repository import TokenRepository
 from shared.repositories.chat_repository import ChatSessionRepository
 from shared.db.session import AsyncSessionLocal
+from shared.utils.number_utils import safe_cast_to_float
 
 async def get_selected_farm_id(chat_session_id: int) -> str:
     """Get the selected farm ID for the given chat session."""
@@ -63,7 +64,7 @@ async def handle_api_transaction(api_response: dict, clasificacion: str, message
     Handle API transaction with customer support.
     """
     note = api_response.get("note", "")
-    value = api_response.get("value", "")
+    raw_value = api_response.get("value", "")
     transaction_type = api_response.get("type", "")
     date = api_response.get("date", "")
     crop_variety = api_response.get("crop_variety", "")
@@ -79,13 +80,26 @@ async def handle_api_transaction(api_response: dict, clasificacion: str, message
         logging.error(f"No selected farm found for chat {chat_session_id}")
         return
     
+    # ------------------------------------------------------------------ #
+    # Robust numeric conversion for the "value" field
+    # ------------------------------------------------------------------ #
+    value_float = safe_cast_to_float(raw_value)
+
+    if value_float is None:
+        logging.error(f"Could not parse numeric value from '{raw_value}'")
+        await message.answer(
+            "❌ No se pudo interpretar el valor numérico proporcionado. "
+            "Por favor, ingresa solo el monto, por ejemplo: 1000"
+        )
+        return
+
     if clasificacion == "gasto":
         await register_expense(
             expense_date=date,
             expense_type_id=transaction_type,
             farm_id=farm_id,
             note=note,
-            value=float(value),
+            value=value_float,
             chat_session_id=chat_session_id 
         )
     elif clasificacion == "ingreso":
@@ -99,7 +113,7 @@ async def handle_api_transaction(api_response: dict, clasificacion: str, message
                 "crop_variety_id": crop_variety,
                 "quantity": int(quantity),
                 "quantity_unit": quantity_unit,
-                "sale_value": float(value)
+                "sale_value": value_float
             }],
             chat_session_id=chat_session_id
         )
