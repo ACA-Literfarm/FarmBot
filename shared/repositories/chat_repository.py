@@ -9,9 +9,10 @@ class ChatSessionRepository(IChatSessionRepository):
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    # TODO: Get latest is_active chat by telegram chat id
     async def get_chat_by_telegram_chat_id(self, telegram_chat_id: int) -> Optional[ChatSession]:
         result = await self.db.execute(
-            select(ChatSession).where(ChatSession.telegram_chat_id == telegram_chat_id)
+            select(ChatSession).where(ChatSession.telegram_chat_id == telegram_chat_id, ChatSession.is_active == True)
         )
         return result.scalar_one_or_none()
 
