@@ -183,7 +183,6 @@ FarmBot/
 ## 🗄️ Base de Datos
 
 ### Esquema de Datos
-
 #### Tabla: `users`
 ```sql
 CREATE TABLE users (
@@ -255,7 +254,7 @@ DB_PASSWORD=tu_password_seguro
 # LiteFarm API
 URL_LITEFARM=https://api.litefarm.org
 
-# Servidor Web (Opcional)
+# Servidor Web
 FLASK_SECRET_KEY=tu_secret_key_flask
 GOOGLE_CLIENT_ID=tu_google_client_id
 GOOGLE_CLIENT_SECRET=tu_google_client_secret
@@ -276,7 +275,7 @@ El sistema valida automáticamente las variables requeridas al inicio.
 
 ---
 
-## 🚀 Instalación y Despliegue
+## 🚀 Instalación
 
 ### Instalación Local
 
@@ -371,14 +370,6 @@ GET  /callback/<provider>  # Callback OAuth2
 POST /logout             # Cerrar sesión
 ```
 
-#### Endpoints de API
-```
-GET  /api/user/profile   # Perfil del usuario
-GET  /api/user/farms     # Granjas del usuario
-POST /api/chat/session   # Crear sesión de chat
-GET  /api/health         # Estado del servicio
-```
-
 ### Integración con LiteFarm API
 
 #### Endpoints Utilizados
@@ -423,29 +414,16 @@ GET  /crop_variety/farm/{farm_id} # Obtener variedades de cultivos por granja
 - `/help` - Mostrar ayuda y comandos disponibles
 - `/login` - Iniciar proceso de autenticación
 - `/cancel` - Cancelar operación actual
-
-### Comandos de Granja
-- `/farms` - Listar granjas disponibles
-- `/select_farm` - Seleccionar granja activa
-- `/farm_info` - Información de la granja actual
-
-### Comandos de Gastos
-- `/add_expense` - Agregar nuevo gasto
-- `/list_expenses` - Listar gastos recientes
-- `/expense_types` - Ver tipos de gastos disponibles
-
-### Comandos de Configuración
-- `/enable_validation` - Habilitar validación de IA
-- `/disable_validation` - Deshabilitar validación de IA
 - `/skip` - Saltar paso actual en conversación
 
-### Estados de Conversación
-El bot maneja estados para conversaciones multi-paso:
-- `WAITING_FOR_EXPENSE_DESCRIPTION`
-- `WAITING_FOR_EXPENSE_AMOUNT`
-- `WAITING_FOR_FARM_SELECTION`
-- `WAITING_FOR_LOGIN_CONFIRMATION`
+### Comandos de Granja
+- `/selectfarm` - Seleccionar granja activa
+- `/currentfarm` - Información de la granja actual
+- `/clearfarm` - Quitar selección de granja
 
+### Comandos de Configuración
+- `/habilitar_validacion` - Habilitar validación de transacciones
+- `/deshabilitar_validacion` - Deshabilitar validación de transacciones
 ---
 
 ## 🤖 Servicios de IA
@@ -678,24 +656,20 @@ Tipos: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 - [ ] Notificaciones push
 - [ ] Integración con sensores IoT
 - [ ] Análisis predictivo con ML
-- [ ] API REST completa
 
 #### Mejoras Técnicas
 - [ ] Implementar Redis para cache
 - [ ] Añadir tests E2E
 - [ ] Containerización completa
-- [ ] CI/CD pipeline
-- [ ] Documentación API con Swagger
 
 ---
 
-## 📞 Soporte y Contacto
+## 📞 Soporte
 
 ### Recursos de Ayuda
 - **Documentación técnica**: Este archivo
 - **Issues de GitHub**: Para reportar bugs
 - **Discussions**: Para preguntas generales
-- **Wiki**: Información adicional
 
 ---
 
