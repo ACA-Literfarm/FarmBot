@@ -200,7 +200,7 @@ def validate_revenue_type(api_response: dict, revenue_types: list) -> Tuple[bool
            str(revenue_type.get("revenue_name", "")).lower() == str(revenue_type_id).lower():
             return True, revenue_type.get("revenue_name", ""), ""
     
-    return False, "", f"❌ Tipo de ingreso '{revenue_type_id}' no encontrado en la lista disponible"
+    return False, "", f"❌ Tipo de ingreso no encontrado en la lista disponible"
 
 
 def validate_crop_variety(api_response: dict, crop_varieties: list) -> Tuple[bool, str, str]:
@@ -250,7 +250,7 @@ def validate_expense_type(api_response: dict, expense_types: list) -> Tuple[bool
            str(expense_type.get("expense_name", "")).lower() == str(expense_type_id).lower():
             return True, expense_type.get("expense_name", ""), ""
     
-    return False, "", f"❌ Tipo de gasto '{expense_type_id}' no encontrado en la lista disponible"
+    return False, "", f"❌ Tipo de gasto no encontrado en la lista disponible"
 
 
 def validate_transaction_context(chat_session_id: int, farm_id: str, token: str) -> Tuple[bool, str]:

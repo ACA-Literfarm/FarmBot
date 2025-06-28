@@ -178,29 +178,31 @@ async def handle_missing_field_completion(message: Message, user_id: int, user_i
         # Cargamos nuevamente los tipos de ingreso y las variedades para
         # validar que lo que el usuario ingresó sea coherente con la
         # configuración de la granja.
-        revenue_types = await request_revenue_types(chat_session_id)
-        if revenue_types is None or len(revenue_types) < 1:
-            await message.answer("Hubo un error en el servidor obteniendo tipos de ingresos, intentalo mas tarde.")
-            return
-
-        is_valid_revenue, revenue_name, revenue_error = validate_revenue_type(api_response, revenue_types)
-        if not is_valid_revenue:
-            await message.answer(revenue_error)
-            return
-
-        # La heurística para determinar venta de cultivo es la misma usada
-        # en otros puntos del código.
-        is_crop_sale = str(api_response.get("type")) == "1" or revenue_name.strip().lower() == "crop sale"
-        if is_crop_sale:
-            crop_varieties = await request_crop_varieties(chat_session_id)
-            if crop_varieties is None:
-                await message.answer("Hubo un error en el servidor obteniendo variedades de cultivos, inténtalo más tarde.")
+        # validar que es ingreso y la clasificacion es de crop
+        if clasificacion == "ingreso" and str(api_response.get("type")) == "1":
+            revenue_types = await request_revenue_types(chat_session_id)
+            if revenue_types is None or len(revenue_types) < 1:
+                await message.answer("Hubo un error en el servidor obteniendo tipos de ingresos, intentalo mas tarde.")
                 return
 
-            is_valid_crop, crop_name, crop_error = validate_crop_variety(api_response, crop_varieties)
-            if not is_valid_crop:
-                await message.answer(crop_error)
+            is_valid_revenue, revenue_name, revenue_error = validate_revenue_type(api_response, revenue_types)
+            if not is_valid_revenue:
+                await message.answer(revenue_error)
                 return
+
+            # La heurística para determinar venta de cultivo es la misma usada
+            # en otros puntos del código.
+            is_crop_sale = str(api_response.get("type")) == "1" or revenue_name.strip().lower() == "crop sale"
+            if is_crop_sale:
+                crop_varieties = await request_crop_varieties(chat_session_id)
+                if crop_varieties is None:
+                    await message.answer("Hubo un error en el servidor obteniendo variedades de cultivos, inténtalo más tarde.")
+                    return
+
+                is_valid_crop, crop_name, crop_error = validate_crop_variety(api_response, crop_varieties)
+                if not is_valid_crop:
+                    await message.answer(crop_error)
+                    return
 
         # Validar contexto de la transacción
         from services.api_service import get_valid_token_for_chat, get_selected_farm_id
@@ -292,6 +294,12 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
             await message.answer(respuesta)
             return
 
+        # If cant clasify a crop variety and clasification is "ingreso", is imposible to register the income
+        if clasificacion == "ingreso" and not api_response.get("crop_variety"):
+            await message.answer("❌ No puedo registrar el ingreso porque no tienes la variedad de cultivo en tu granja.")
+            return
+
+        print(f"Clasificación: {clasificacion}, Respuesta: {respuesta}, API Response: {api_response}")
         # Validate API response types and generate user-friendly messages
         if clasificacion == "gasto":
             await process_expense_classification(message, api_response, expense_type, selected_farm, respuesta)
@@ -360,6 +368,7 @@ async def process_expense_classification(message: Message, api_response: dict, e
 
 
 async def process_revenue_classification(message: Message, api_response: dict, revenue_type: list, crop_varieties: list, selected_farm, respuesta: str):
+    print(f"Processing revenue classification with API response: {api_response}, revenue_type: {revenue_type}, crop_varieties: {crop_varieties}, selected_farm: {selected_farm}, respuesta: {respuesta}")
     """Process revenue classification and update response message."""
     # Validate revenue type
     is_valid_revenue, revenue_name, revenue_error = validate_revenue_type(api_response, revenue_type)
