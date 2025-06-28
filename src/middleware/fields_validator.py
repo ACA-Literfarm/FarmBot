@@ -7,6 +7,41 @@ based on the API requirements in api_service.py.
 from typing import Tuple, List, Dict, Any, Optional
 from datetime import date
 import logging
+import re
+
+# Allowed units and their common synonyms for sale quantities
+VALID_QUANTITY_UNITS = {
+    "kg": ["kg", "kilo", "kilos", "kilogramo", "kilogramos"],
+    "lb": ["lb", "libra", "libras", "pound", "pounds"],
+    "unit": ["unit", "units", "unidad", "unidades", "u"],
+    "g": ["g", "gramo", "gramos"],
+    "l": ["l", "litro", "litros"],
+    "ml": ["ml", "mililitro", "mililitros"]
+}
+
+
+def _canonical_quantity_unit(unit: str) -> str:
+    """Return the canonical representation of a quantity_unit or an empty
+    string if the unit is not recognised.
+
+    The canonical form is the key used in VALID_QUANTITY_UNITS (e.g. "kg",
+    "lb", "unit", ...).
+    """
+    if not unit:
+        return ""
+
+    unit_clean = unit.strip().lower()
+
+    # Direct match first
+    if unit_clean in VALID_QUANTITY_UNITS:
+        return unit_clean
+
+    # Check synonyms
+    for canonical, synonyms in VALID_QUANTITY_UNITS.items():
+        if unit_clean in synonyms:
+            return canonical
+
+    return ""
 
 
 def validate_expense_fields(api_response: dict) -> Tuple[List[str], str]:
@@ -89,10 +124,38 @@ def validate_revenue_fields(api_response: dict) -> Tuple[List[str], str]:
     if str(revenue_type) == "1":  # Crop sale
         if not api_response.get("crop_variety"):
             missing_fields.append("crop_variety")
+
+        # ---- Quantity & Unit Normalisation ---- #
+        # If the AI bundled the quantity and unit together (e.g. "1kg"), try to split.
+        raw_quantity = str(api_response.get("quantity", "")).strip()
+        raw_unit = str(api_response.get("quantity_unit", "")).strip()
+
+        # Pattern: <number><optional space><unit>
+        combined_re = re.compile(r"^(\d+(?:[\.,]\d+)?)\s*([a-zA-Zµáéíóú]+)$")
+
+        if raw_quantity and not raw_unit:
+            match = combined_re.match(raw_quantity)
+            if match:
+                # The quantity field actually holds both number and unit
+                qty_number, qty_unit = match.groups()
+                api_response["quantity"] = qty_number.replace(",", ".")
+                raw_unit = qty_unit  # Continue validation below
+
+        if raw_unit and raw_unit.isdigit():
+            # The unit field contains only digits -> probably the sale value was mis-tagged.
+            # Treat as missing unit so user is prompted again.
+            raw_unit = ""
+
+        canonical_unit = _canonical_quantity_unit(raw_unit)
+
         if not api_response.get("quantity"):
             missing_fields.append("quantity")
-        if not api_response.get("quantity_unit"):
+
+        if not canonical_unit:
+            # Invalidate unit if unknown
             missing_fields.append("quantity_unit")
+        else:
+            api_response["quantity_unit"] = canonical_unit
     
     error_message = ""
     if missing_fields:
@@ -137,7 +200,7 @@ def validate_revenue_type(api_response: dict, revenue_types: list) -> Tuple[bool
            str(revenue_type.get("revenue_name", "")).lower() == str(revenue_type_id).lower():
             return True, revenue_type.get("revenue_name", ""), ""
     
-    return False, "", f"❌ Tipo de ingreso '{revenue_type_id}' no encontrado en la lista disponible"
+    return False, "", f"❌ Tipo de ingreso no encontrado en la lista disponible"
 
 
 def validate_crop_variety(api_response: dict, crop_varieties: list) -> Tuple[bool, str, str]:
@@ -187,7 +250,7 @@ def validate_expense_type(api_response: dict, expense_types: list) -> Tuple[bool
            str(expense_type.get("expense_name", "")).lower() == str(expense_type_id).lower():
             return True, expense_type.get("expense_name", ""), ""
     
-    return False, "", f"❌ Tipo de gasto '{expense_type_id}' no encontrado en la lista disponible"
+    return False, "", f"❌ Tipo de gasto no encontrado en la lista disponible"
 
 
 def validate_transaction_context(chat_session_id: int, farm_id: str, token: str) -> Tuple[bool, str]:
