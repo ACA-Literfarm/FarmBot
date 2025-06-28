@@ -193,18 +193,58 @@ async def handle_regular_message(message: Message):
         )
 
 
+async def show_field_progress(message: Message, user_id: int, state: dict, completed_field: str = ""):
+    """Show progress of field completion to the user."""
+    api_response = state["api_response"]
+    clasificacion = state.get("clasificacion", "")
+    
+    # Create a summary of completed fields
+    completed_fields = []
+    for field, value in api_response.items():
+        if value and field not in ["farm_id", "date"]:  # Skip system fields
+            field_display_names = {
+                "note": "📝 Descripción",
+                "value": "💰 Valor",
+                "type": "📂 Tipo",
+                "crop_variety": "🌱 Cultivo",
+                "customer": "👤 Cliente",
+                "quantity": "📊 Cantidad",
+                "quantity_unit": "📏 Unidad"
+            }
+            display_name = field_display_names.get(field, field)
+            completed_fields.append(f"✅ {display_name}: {value}")
+    
+    if completed_fields:
+        progress_message = f"📋 **Progreso de la transacción:**\n\n"
+        progress_message += "\n".join(completed_fields)
+        
+        if completed_field:
+            progress_message += f"\n\n🎉 **Campo completado:** {completed_field}"
+        
+        await message.answer(progress_message)
+
+
 async def handle_missing_field_completion(message: Message, user_id: int, user_input: str, selected_farm):
     """Handle completion of missing fields by the user."""
     state = user_states[user_id]
     missing_field = state["missing_fields"].pop(0)  # Get the next missing field
 
+    # Get available crops if we're validating crop_variety field
+    available_crops = None
+    if missing_field == "crop_variety":
+        from services.api_service import request_crop_varieties
+        available_crops = await request_crop_varieties(message.chat.id)
+
     # Validate the user's input for the specific field
-    is_valid, error_message = validate_field(missing_field, user_input)
+    is_valid, error_message = validate_field(missing_field, user_input, available_crops)
 
     if not is_valid:
         # If invalid, re-add the field to the front of the list and ask again
         state["missing_fields"].insert(0, missing_field)
-        await message.answer(error_message)
+        
+        # Provide more helpful error messages with examples
+        enhanced_error = await enhance_error_message(error_message, missing_field, state)
+        await message.answer(enhanced_error)
         await request_next_missing_field(message, user_id, missing_field)
         return
 
@@ -214,6 +254,8 @@ async def handle_missing_field_completion(message: Message, user_id: int, user_i
 
     # If there are still missing fields, request the next one
     if state["missing_fields"]:
+        remaining_count = len(state["missing_fields"])
+        await message.answer(f"🔄 **Faltan {remaining_count} campo(s) por completar.**")
         await request_next_missing_field(message, user_id, state["missing_fields"][0])
         return
     else:
@@ -274,6 +316,33 @@ async def handle_missing_field_completion(message: Message, user_id: int, user_i
             await process_transaction_directly(message, respuesta, api_response, clasificacion)
 
 
+async def enhance_error_message(error_message: str, field_name: str, state: dict) -> str:
+    """Enhance error messages with field-specific examples and guidance."""
+    enhanced_message = error_message
+    
+    # Add field-specific examples and guidance
+    field_examples = {
+        "value": "\n\n💡 **Ejemplos válidos:**\n• 1000\n• 1,500\n• $2500\n• 75.50",
+        "note": "\n\n💡 **Ejemplos válidos:**\n• Compra de fertilizante\n• Venta de tomates\n• Pago de mano de obra\n• Mantenimiento de equipos",
+        "type": "\n\n💡 **Tipos disponibles:**\n• Para gastos: Fertilizante, Pesticidas, Mano de obra, etc.\n• Para ingresos: Venta de cultivos, Servicios, Otros",
+        "customer": "\n\n💡 **Ejemplos válidos:**\n• Juan Pérez\n• Cooperativa del Campo\n• Restaurante El Buen Sabor\n• Mercado Central",
+        "quantity": "\n\n💡 **Ejemplos válidos:**\n• 10\n• 25.5\n• 100",
+        "quantity_unit": "\n\n💡 **Unidades válidas:**\n• kg, g, lb, ton\n• unidades, piezas\n• litros, ml, galones\n• cajas, sacos"
+    }
+    
+    # Special handling for crop_variety - don't add examples since validation already shows available crops
+    if field_name == "crop_variety":
+        enhanced_message += "\n\n🔄 **Puedes intentar de nuevo o usar /cancel para cancelar la transacción.**"
+        return enhanced_message
+    
+    if field_name in field_examples:
+        enhanced_message += field_examples[field_name]
+    
+    # Add general guidance
+    enhanced_message += "\n\n🔄 **Puedes intentar de nuevo o usar /cancel para cancelar la transacción.**"
+    
+    return enhanced_message
+
 async def request_next_missing_field(message: Message, user_id: int, field_name: str):
     """Request the next missing field from the user."""
     # Create inline keyboard with cancel button
@@ -281,18 +350,145 @@ async def request_next_missing_field(message: Message, user_id: int, field_name:
         [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
     ])
     
+    # Special handling for crop variety field - show available crops
+    if field_name == "crop_variety":
+        await request_crop_variety_selection(message, user_id)
+        return
+    
+    # Enhanced field messages with examples and guidance
     field_messages = {
-        "value": "💰 Por favor, ingresa el valor/monto de la transacción:",
-        "note": "📝 Por favor, proporciona una descripción de la transacción:",
-        "type": "📂 Por favor, indica el tipo de transacción:",
-        "crop_variety": "🌱 Por favor, especifica la variedad de cultivo:",
-        "customer": "👤 Por favor, indica el nombre del cliente:",
-        "quantity": "📊 Por favor, indica la cantidad vendida (ej: 10):",
-        "quantity_unit": "📏 Por favor, indica la unidad de medida (ej: kg, unidades, litros):"
+        "value": (
+            "💰 **Por favor, ingresa el valor/monto de la transacción:**\n\n"
+            "💡 **Ejemplos:**\n"
+            "• 1000 (mil dólares)\n"
+            "• 1,500 (mil quinientos)\n"
+            "• $2500 (dos mil quinientos)\n"
+            "• 75.50 (setenta y cinco con cincuenta centavos)"
+        ),
+        "note": (
+            "📝 **Por favor, proporciona una descripción de la transacción:**\n\n"
+            "💡 **Ejemplos:**\n"
+            "• Compra de fertilizante para el maíz\n"
+            "• Venta de tomates al mercado\n"
+            "• Pago de mano de obra para cosecha\n"
+            "• Mantenimiento del tractor"
+        ),
+        "type": (
+            "📂 **Por favor, indica el tipo de transacción:**\n\n"
+            "💡 **Tipos disponibles:**\n"
+            "• Para gastos: Fertilizante, Pesticidas, Mano de obra, etc.\n"
+            "• Para ingresos: Venta de cultivos, Servicios, Otros\n\n"
+            "📋 Puedes escribir el nombre o ID del tipo"
+        ),
+        "customer": (
+            "👤 **Por favor, indica el nombre del cliente:**\n\n"
+            "💡 **Ejemplos:**\n"
+            "• Juan Pérez\n"
+            "• Cooperativa del Campo\n"
+            "• Restaurante El Buen Sabor\n"
+            "• Mercado Central\n\n"
+            "💡 O escribe /skip para usar 'Cliente General'"
+        ),
+        "quantity": (
+            "📊 **Por favor, indica la cantidad vendida:**\n\n"
+            "💡 **Ejemplos:**\n"
+            "• 10 (diez unidades)\n"
+            "• 25.5 (veinticinco y medio)\n"
+            "• 100 (cien unidades)\n\n"
+            "📋 Solo el número, sin la unidad"
+        ),
+        "quantity_unit": (
+            "📏 **Por favor, indica la unidad de medida:**\n\n"
+            "💡 **Unidades válidas:**\n"
+            "• kg, g, lb, ton (peso)\n"
+            "• unidades, piezas (cantidad)\n"
+            "• litros, ml, galones (volumen)\n"
+            "• cajas, sacos (empaque)\n\n"
+            "📋 Escribe solo la unidad (ej: kg, unidades, litros)"
+        )
     }
     
     message_text = field_messages.get(field_name, f"Por favor, proporciona el campo: {field_name}")
     await message.answer(message_text, reply_markup=keyboard)
+
+
+async def request_crop_variety_selection(message: Message, user_id: int):
+    """Show available crops for selection with inline buttons."""
+    from services.api_service import request_crop_varieties
+    
+    try:
+        # Get available crop varieties for the current farm
+        crop_varieties = await request_crop_varieties(message.chat.id)
+        
+        if not crop_varieties or len(crop_varieties) == 0:
+            await message.answer(
+                "🌱 **No hay cultivos registrados en tu granja.**\n\n"
+                "📝 **Para registrar ventas de cultivos, necesitas:**\n"
+                "1. Ir a tu página de LiteFarm\n"
+                "2. Registrar al menos un cultivo en tu granja\n"
+                "3. Volver aquí para registrar la venta\n\n"
+                "💡 Una vez que tengas cultivos registrados, podrás seleccionarlos fácilmente.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
+                ])
+            )
+            return
+        
+        # Create buttons for each crop variety
+        buttons = []
+        for crop in crop_varieties:
+            crop_id = crop.get("crop_variety_id", "")
+            crop_name = crop.get("crop_variety_name", "")
+            if crop_id and crop_name:
+                # Create compact callback data to avoid BUTTON_DATA_INVALID error
+                # Format: crop_{user_id}_{crop_id} (crop name will be retrieved from API later)
+                callback_data = f"crop_{user_id}_{crop_id}"
+                
+                # Validate callback data length (Telegram limit is 64 bytes)
+                if len(callback_data) > 60:  # Leave some buffer
+                    print(f"Warning: Callback data too long for crop {crop_name}: {len(callback_data)} bytes")
+                    continue
+                
+                # Truncate crop name if too long for button text
+                display_name = crop_name[:20] + "..." if len(crop_name) > 20 else crop_name
+                
+                buttons.append([
+                    InlineKeyboardButton(
+                        text=f"🌱 {display_name}",
+                        callback_data=callback_data
+                    )
+                ])
+        
+        if not buttons:
+            await message.answer(
+                "🌱 **Error al cargar los cultivos.**\n\n"
+                "No se pudieron cargar los cultivos de tu granja. Por favor, intenta nuevamente.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
+                ])
+            )
+            return
+        
+        # Add cancel button
+        buttons.append([InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")])
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+        
+        await message.answer(
+            "🌱 **Selecciona el cultivo que vendiste:**\n\n"
+            "Elige uno de los cultivos disponibles en tu granja:",
+            reply_markup=keyboard
+        )
+        
+    except Exception as e:
+        print(f"Error in request_crop_variety_selection: {e}")
+        await message.answer(
+            "❌ **Error al cargar los cultivos.**\n\n"
+            "Hubo un problema al obtener los cultivos de tu granja. Por favor, intenta nuevamente.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Cancelar", callback_data=f"cancel_incomplete_{user_id}")]
+            ])
+        )
 
 
 async def process_new_message(message: Message, user_input: str, selected_farm, user_id: int):
@@ -427,14 +623,21 @@ async def process_revenue_classification(message: Message, api_response: dict, r
         await message.answer(revenue_error)
         return
 
-    # Check if it's a crop sale and validate crop variety
+    # Check if it's a crop sale by looking for crop_variety field
     selected_crop_name = revenue_name
-    if revenue_name.strip().lower() == "crop sale":
+    if api_response.get("crop_variety"):
+        # This is a crop sale, get the crop name from the crop_variety field
+        print(f"DEBUG: Found crop_variety in api_response: {api_response.get('crop_variety')}")
         is_valid_crop, crop_name, crop_error = validate_crop_variety(api_response, crop_varieties)
-        if not is_valid_crop:
-            await message.answer(crop_error)
-            return
-        selected_crop_name = crop_name
+        print(f"DEBUG: validate_crop_variety result: is_valid={is_valid_crop}, crop_name='{crop_name}', error='{crop_error}'")
+        if is_valid_crop and crop_name:
+            selected_crop_name = crop_name
+            print(f"DEBUG: Using crop name: {selected_crop_name}")
+        # If crop validation fails, we'll still use the revenue_name as fallback
+        else:
+            print(f"DEBUG: Crop validation failed, using revenue_name as fallback: {revenue_name}")
+    else:
+        print(f"DEBUG: No crop_variety found, using revenue_name: {revenue_name}")
 
     # Handle customer field - set default if empty
     customer_name = api_response.get("customer", "").strip()
@@ -447,6 +650,8 @@ async def process_revenue_classification(message: Message, api_response: dict, r
     value = api_response.get("value", "")
     transaction_date = format_date_for_display(api_response.get("date", ""))
     formatted_value = format_currency_value(value)
+    
+    print(f"DEBUG: Final selected_crop_name for formatted_response: {selected_crop_name}")
     
     api_response["formatted_response"] = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} en la granja **{selected_farm.name}** 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
 
