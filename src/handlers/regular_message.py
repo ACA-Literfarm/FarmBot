@@ -129,6 +129,9 @@ async def handle_missing_field_completion(message: Message, user_id: int, user_i
         clasificacion = state.get("clasificacion", "")
         respuesta = state["respuesta"]
         
+        # Id de la sesión de chat de Telegram
+        chat_session_id = message.chat.id
+        
         # ADD FARM ID TO API RESPONSE
         api_response["farm_id"] = selected_farm.litefarm_farm_id
         
@@ -149,6 +152,36 @@ async def handle_missing_field_completion(message: Message, user_id: int, user_i
             missing_fields, validation_error = validate_revenue_fields(api_response)
             if missing_fields:
                 await message.answer(validation_error)
+                return
+
+        # -----------------------------------------------------------------
+        # Validación adicional: comprobar que la variedad de cultivo exista
+        # -----------------------------------------------------------------
+        # Cargamos nuevamente los tipos de ingreso y las variedades para
+        # validar que lo que el usuario ingresó sea coherente con la
+        # configuración de la granja.
+        revenue_types = await request_revenue_types(chat_session_id)
+        if revenue_types is None or len(revenue_types) < 1:
+            await message.answer("Hubo un error en el servidor obteniendo tipos de ingresos, intentalo mas tarde.")
+            return
+
+        is_valid_revenue, revenue_name, revenue_error = validate_revenue_type(api_response, revenue_types)
+        if not is_valid_revenue:
+            await message.answer(revenue_error)
+            return
+
+        # La heurística para determinar venta de cultivo es la misma usada
+        # en otros puntos del código.
+        is_crop_sale = str(api_response.get("type")) == "1" or revenue_name.strip().lower() == "crop sale"
+        if is_crop_sale:
+            crop_varieties = await request_crop_varieties(chat_session_id)
+            if crop_varieties is None:
+                await message.answer("Hubo un error en el servidor obteniendo variedades de cultivos, inténtalo más tarde.")
+                return
+
+            is_valid_crop, crop_name, crop_error = validate_crop_variety(api_response, crop_varieties)
+            if not is_valid_crop:
+                await message.answer(crop_error)
                 return
 
         # Validar contexto de la transacción
@@ -316,11 +349,18 @@ async def process_revenue_classification(message: Message, api_response: dict, r
         await message.answer(revenue_error)
         return
 
-    # Check if it's a crop sale and validate crop variety
+    # Check if it's a crop sale and validate crop variety.
+    # According to LiteFarm, revenue_type_id == 1 represents crop sales, but we
+    # also keep the legacy "crop sale" name check for safety.
     selected_crop_name = revenue_name
-    if revenue_name.strip().lower() == "crop sale":
+    is_crop_sale = str(api_response.get("type")) == "1" or revenue_name.strip().lower() == "crop sale"
+
+    if is_crop_sale:
         is_valid_crop, crop_name, crop_error = validate_crop_variety(api_response, crop_varieties)
         if not is_valid_crop:
+            # Early-exit if the crop variety provided by the user is not present
+            # in the farm.  This prevents the bot from entering a loop asking
+            # for missing fields that will never validate.
             await message.answer(crop_error)
             return
         selected_crop_name = crop_name
@@ -331,13 +371,18 @@ async def process_revenue_classification(message: Message, api_response: dict, r
         api_response["customer"] = "Cliente General"
         customer_name = "Cliente General"
 
-    # Update response with transaction details
+    # Build the human-friendly confirmation/response text regardless of the
+    # revenue type so that later stages can simply reuse it.
     note = api_response.get("note", "")
     value = api_response.get("value", "")
     transaction_date = format_date_for_display(api_response.get("date", ""))
     formatted_value = format_currency_value(value)
-    
-    api_response["formatted_response"] = f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} en la granja **{selected_farm.name}** 🚜💰. Si tienes más ingresos o gastos para registrar, avísame."
+
+    api_response["formatted_response"] = (
+        f"Seleccioné este tipo: {revenue_name}\n\n¡Listo! He registrado {note.lower()} por {formatted_value} el dia {transaction_date} "
+        f"como ingreso de {selected_crop_name.lower()} para el cliente {customer_name} en la granja **{selected_farm.name}** 🚜💰. "
+        "Si tienes más ingresos o gastos para registrar, avísame."
+    )
 
 
 async def finalize_transaction(message: Message, api_response: dict, clasificacion: str, respuesta: str, user_id: int):
@@ -353,6 +398,38 @@ async def finalize_transaction(message: Message, api_response: dict, clasificaci
     if not context_valid:
         await message.answer(context_error)
         return
+
+    # ---------------------------------------------------------------------
+    # Extra validation for revenue transactions completed a posteriori
+    # ---------------------------------------------------------------------
+    if clasificacion == "ingreso":
+        # Fetch latest reference data so we can validate again now that the
+        # user might have supplied any missing fields (e.g. crop variety).
+        revenue_types = await request_revenue_types(chat_session_id)
+        if revenue_types is None or len(revenue_types) < 1:
+            await message.answer("Hubo un error en el servidor obteniendo tipos de ingresos, intentalo mas tarde.")
+            return
+
+        # Validate that the revenue type still exists
+        is_valid_revenue, revenue_name, revenue_error = validate_revenue_type(api_response, revenue_types)
+        if not is_valid_revenue:
+            await message.answer(revenue_error)
+            return
+
+        # If it is a crop sale (revenue_type_id == 1) validate the crop
+        # variety against the farm catalogue. We reuse the same heuristic used
+        # earlier (type == 1 or revenue name == "crop sale").
+        is_crop_sale = str(api_response.get("type")) == "1" or revenue_name.strip().lower() == "crop sale"
+        if is_crop_sale:
+            crop_varieties = await request_crop_varieties(chat_session_id)
+            if crop_varieties is None:
+                await message.answer("Hubo un error en el servidor obteniendo variedades de cultivos, inténtalo más tarde.")
+                return
+
+            is_valid_crop, crop_name, crop_error = validate_crop_variety(api_response, crop_varieties)
+            if not is_valid_crop:
+                await message.answer(crop_error)
+                return
 
     # Apply default customer if empty for revenue
     if clasificacion == "ingreso" and not api_response.get("customer"):
