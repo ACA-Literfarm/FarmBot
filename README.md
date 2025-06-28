@@ -281,6 +281,12 @@ El sistema valida automáticamente las variables requeridas al inicio.
 ### Instalación Local
 
 #### 1. Prerrequisitos
+
+**LiteFarm Sistema Principal**
+- **API, Base de Datos y Cliente Web de LiteFarm**: Debes tener ejecutándose localmente la plataforma principal LiteFarm
+- **Documentación de instalación**: [Ver README de LiteFarm](https://github.com/ACA-Literfarm/ACA-SSHROOTUCA-LiteFarm/blob/main/README.md)
+
+**Entorno Local**
 ```bash
 # Python 3.11+
 python3 --version
