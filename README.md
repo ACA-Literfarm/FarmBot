@@ -47,23 +47,7 @@ FarmBot es un microservicio que forma parte del ecosistema LiteFarm, diseñado p
 
 ## 🏗️ Arquitectura del Sistema
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Telegram Bot  │    │   Web Server    │    │   PostgreSQL    │
-│    (aiogram)    │◄──►│    (Flask)      │◄──►│   Database      │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   AI Service    │    │  OAuth2 Google  │    │   Alembic       │
-│ (OpenAI/DeepSeek)│    │  Authentication │    │  Migrations     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                                             │
-         ▼                                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    LiteFarm API Integration                     │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Arquitectura del Sistema](documentation_resources/FarmBot-Arquitecture.jpeg)
 
 ### Flujo Principal
 
