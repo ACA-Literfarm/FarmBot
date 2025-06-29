@@ -4,7 +4,7 @@ This module contains all the validation logic for required fields
 based on the API requirements in api_service.py.
 """
 
-from typing import Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any, Optional
 from datetime import date
 import logging
 import re
@@ -286,4 +286,111 @@ def validate_transaction_context(chat_session_id: int, farm_id: str, token: str)
         
         return False, error_message
     
+    return True, ""
+
+
+def validate_crop_variety_input(value: str, available_crops: list) -> Tuple[bool, str]:
+    """
+    Validate that the crop variety input matches one of the available crops.
+    
+    Args:
+        value: The user input for crop variety
+        available_crops: List of available crop varieties from the API
+        
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not value or not value.strip():
+        return False, "❌ La variedad de cultivo no puede estar vacía. Por favor, especifica la variedad de cultivo."
+    
+    # Check if the input matches any available crop (by ID or name)
+    for crop in available_crops:
+        crop_id = str(crop.get("crop_variety_id", ""))
+        crop_name = crop.get("crop_variety_name", "").lower()
+        input_value = value.strip().lower()
+        
+        # Check if input matches crop ID or crop name
+        if input_value == crop_id or input_value == crop_name:
+            return True, ""
+    
+    # If no match found, return error with available options
+    available_names = [crop.get("crop_variety_name", "") for crop in available_crops if crop.get("crop_variety_name")]
+    error_message = f"❌ '{value}' no es un cultivo válido en tu granja.\n\n"
+    error_message += "💡 **Cultivos disponibles:**\n"
+    for name in available_names:
+        error_message += f"• {name}\n"
+    error_message += "\n🔄 **Por favor:**\n"
+    error_message += "• Selecciona un cultivo de la lista de botones, o\n"
+    error_message += "• Escribe exactamente el nombre de uno de los cultivos disponibles"
+    
+    return False, error_message
+
+
+def validate_field(field_name: str, value: Any, available_crops: Optional[List[Dict[str, Any]]] = None) -> Tuple[bool, str]:
+    """
+    Validate a single field's value based on its name.
+
+    Args:
+        field_name: The name of the field to validate.
+        value: The value of the field to validate.
+        available_crops: List of available crops for crop_variety validation.
+
+    Returns:
+        A tuple containing a boolean indicating if the field is valid,
+        and an error message if it's not.
+    """
+    # Handle empty or None values
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return False, f"❌ El campo '{field_name}' no puede estar vacío. Por favor, proporciona un valor."
+    
+    # Numeric field validation
+    if field_name in ["value", "quantity"]:
+        try:
+            # Remove commas for thousands separators if present
+            if isinstance(value, str):
+                value = value.replace(",", "").replace("$", "").strip()
+            numeric_value = float(value)
+            if numeric_value <= 0:
+                return False, f"❌ El valor para '{field_name}' debe ser mayor que cero. Por favor, inténtalo de nuevo."
+        except (ValueError, TypeError):
+            return False, f"❌ El valor para '{field_name}' debe ser un número válido. Por favor, inténtalo de nuevo."
+
+    # Text field validation
+    if field_name == "note":
+        if not isinstance(value, str) or not value.strip():
+            return False, "❌ La descripción no puede estar vacía. Por favor, proporciona una descripción de la transacción."
+        if len(value.strip()) < 3:
+            return False, "❌ La descripción debe tener al menos 3 caracteres. Por favor, proporciona una descripción más detallada."
+
+    # Type field validation (for both expense and revenue types)
+    if field_name == "type":
+        if not isinstance(value, str) or not value.strip():
+            return False, "❌ El tipo de transacción no puede estar vacío. Por favor, indica el tipo de transacción."
+        # Additional validation could be added here if we have access to the available types
+
+    # Customer field validation
+    if field_name == "customer":
+        if not isinstance(value, str) or not value.strip():
+            return False, "❌ El nombre del cliente no puede estar vacío. Por favor, indica el nombre del cliente."
+        if len(value.strip()) < 2:
+            return False, "❌ El nombre del cliente debe tener al menos 2 caracteres. Por favor, proporciona un nombre válido."
+
+    # Crop variety field validation - special validation against available crops
+    if field_name == "crop_variety":
+        if available_crops is None:
+            # If no crops available, just check it's not empty
+            if not isinstance(value, str) or not value.strip():
+                return False, "❌ La variedad de cultivo no puede estar vacía. Por favor, especifica la variedad de cultivo."
+        else:
+            # Validate against available crops
+            return validate_crop_variety_input(value, available_crops)
+
+    # Quantity unit field validation
+    if field_name == "quantity_unit":
+        valid_units = ["kg", "g", "lb", "ton", "unidades", "litros", "ml", "galones", "piezas", "cajas", "sacos"]
+        if not isinstance(value, str) or not value.strip():
+            return False, "❌ La unidad de medida no puede estar vacía. Por favor, especifica la unidad (ej: kg, unidades, litros)."
+        if value.strip().lower() not in [unit.lower() for unit in valid_units]:
+            return False, f"❌ Unidad de medida no reconocida. Unidades válidas: {', '.join(valid_units)}. Por favor, inténtalo de nuevo."
+
     return True, ""
