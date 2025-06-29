@@ -3,99 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Error - LiteFarm</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .error-container {
-            max-width: 600px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            overflow: hidden;
-            text-align: center;
-        }
-        .error-header {
-            background: linear-gradient(135deg, #f44336 0%, #ff5722 100%);
-            color: white;
-            padding: 30px;
-        }
-        .error-header h1 {
-            margin: 0;
-            font-size: 2em;
-        }
-        .error-content {
-            padding: 30px;
-        }
-        .error-icon {
-            font-size: 4em;
-            margin-bottom: 20px;
-        }
-        .error-message {
-            color: #333;
-            font-size: 1.1em;
-            margin-bottom: 30px;
-            line-height: 1.6;
-        }
-        .back-button {
-            display: inline-block;
-            padding: 12px 24px;
-            background: #4facfe;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background 0.3s;
-            font-weight: bold;
-        }
-        .back-button:hover {
-            background: #3d8bfe;
-        }
-        .error-details {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-family: monospace;
-            text-align: left;
-            word-break: break-word;
-            color: #666;
-            font-size: 0.9em;
-        }
-    </style>
+    <title>LiteFarm - Error</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-    <div class="error-container">
-        <div class="error-header">
-            <div class="error-icon">⚠️</div>
-            <h1>Error</h1>
-        </div>
-        
-        <div class="error-content">
-            <div class="error-message">
+    <div class="container">
+        <div class="login-card">
+            <!-- Logo de LiteFarm con ícono de error -->
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="LiteFarm Logo" class="main-logo">
+                <div class="error-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+            </div>
+
+            <!-- Mensaje de error -->
+            <div class="status-message error-message">
+                <i class="fas fa-exclamation-circle"></i>
                 {% if error %}
-                    {{ error }}
+                    {{ error|e }}
                 {% else %}
                     Ha ocurrido un error inesperado. Por favor, intenta nuevamente.
                 {% endif %}
             </div>
-            
-            {% if error %}
-            <div class="error-details">
-                <strong>Detalles del error:</strong><br>
-                {{ error }}
+
+            <!-- Botón para volver -->
+            <div class="login-options">
+                <a href="/" style="text-decoration: none;">
+                    <button class="login-btn" style="background-color: #ffc107; border-color: #ffc107; color: #8B6E00;">
+                        <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>
+                        Volver al inicio
+                    </button>
+                </a>
+            </div>
+
+            <!-- Detalles del error (solo para desarrollo/debug) -->
+            {% if error and config.DEBUG %}
+            <div class="error-details" style="
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                padding: 15px;
+                margin-top: 20px;
+                width: 100%;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                color: #6c757d;
+                word-break: break-all;
+                text-align: left;
+            ">
+                <strong>Detalles técnicos:</strong><br>
+                {{ error|e }}
             </div>
             {% endif %}
-            
-            <a href="/" class="back-button">← Volver al inicio</a>
         </div>
     </div>
+
+    <style>
+        .error-icon {
+            font-size: 30px;
+            color: #dc3545;
+        }
+        
+        .error-details {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+    </style>
 </body>
 </html>
