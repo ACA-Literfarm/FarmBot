@@ -41,52 +41,6 @@ farm_service = FarmSelectionService(
 # Diccionario para rastrear el estado del usuario
 user_states = {}
 
-def is_greeting_message(text: str) -> bool:
-    """
-    Check if the message is a greeting message.
-    
-    Args:
-        text: The message text to check
-        
-    Returns:
-        True if the message is a greeting, False otherwise
-    """
-    if not text:
-        return False
-    
-    # Convert to lowercase for case-insensitive matching
-    text_lower = text.lower().strip()
-    
-    # Common greeting patterns in Spanish
-    greeting_patterns = [
-        r'^hola\b',
-        r'^buenos\s+(días|dias|tardes|noches)\b',
-        r'^buen\s+(día|dia|tarde|noche)\b',
-        r'^saludos\b',
-        r'^qué\s+tal\b',
-        r'^como\s+estás\b',
-        r'^cómo\s+estás\b',
-        r'^que\s+tal\b',
-        r'^hey\b',
-        r'^hi\b',
-        r'^hello\b',
-        r'^good\s+(morning|afternoon|evening)\b',
-        r'^how\s+are\s+you\b',
-        r'^what\'s\s+up\b',
-        r'^whats\s+up\b',
-        r'^sup\b',
-        r'^yo\b',
-        r'^epa\b',
-        r'^che\b'
-    ]
-    
-    # Check if any greeting pattern matches
-    for pattern in greeting_patterns:
-        if re.search(pattern, text_lower):
-            return True
-    
-    return False
-
 def get_greeting_response() -> str:
     """
     Get a friendly greeting response explaining what the bot does.
@@ -170,10 +124,6 @@ async def handle_regular_message(message: Message):
         await message.answer("❌ No se pudo identificar el chat. Por favor, intenta nuevamente.")
         return
 
-    # STEP 0: Check if this is a greeting message first
-    if is_greeting_message(user_input):
-        await message.answer(get_greeting_response())
-        return
 
     # STEP 1: Check if there is a selected farm
     selected_farm = await fetch_selected_farm_if_exists(chat_id=chat_id)
@@ -255,15 +205,15 @@ async def handle_missing_field_completion(message: Message, user_id: int, user_i
     logging.info(f"User {user_id} provided value for missing field '{missing_field}': {user_input}")
 
 
-    if not is_valid:
-        # If invalid, re-add the field to the front of the list and ask again
-        state["missing_fields"].insert(0, missing_field)
+    # if not is_valid:
+    #     # If invalid, re-add the field to the front of the list and ask again
+    #     state["missing_fields"].insert(0, missing_field)
         
-        # Provide more helpful error messages with examples
-        enhanced_error = await enhance_error_message(error_message, missing_field, state)
-        await message.answer(enhanced_error)
-        await request_next_missing_field(message, user_id, missing_field)
-        return
+    #     # Provide more helpful error messages with examples
+    #     enhanced_error = await enhance_error_message(error_message, missing_field, state)
+    #     await message.answer(enhanced_error)
+    #     await request_next_missing_field(message, user_id, missing_field)
+    #     return
 
     # If valid, save the value
     state["api_response"][missing_field] = user_input
