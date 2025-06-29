@@ -45,7 +45,7 @@ app.secret_key = config.FLASK_SECRET_KEY or secrets.token_urlsafe(32)
 
 # Security configurations
 app.config.update(
-    SESSION_COOKIE_SECURE=True if not config.DEBUG else False,  # HTTPS only in production
+    SESSION_COOKIE_SECURE=False,  # Set to True in production with HTTPS
     SESSION_COOKIE_HTTPONLY=True,  # Prevent XSS access to session cookies
     SESSION_COOKIE_SAMESITE='Lax',  # CSRF protection
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1),  # Session timeout
@@ -57,8 +57,8 @@ def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    if not config.DEBUG:
-        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    # Uncomment for production with HTTPS:
+    # response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
 
 # Input validation functions
@@ -79,10 +79,7 @@ def validate_chat_id(chat_id):
 
 def sanitize_error_message(error_msg, is_debug=False):
     """Sanitize error messages to prevent information disclosure"""
-    if is_debug:
-        return escape(str(error_msg))
-    
-    # Generic error messages for production
+    # Always return generic error messages for security
     generic_errors = {
         'connection': 'Servicio temporalmente no disponible. Intenta más tarde.',
         'timeout': 'Tiempo de espera agotado. Intenta nuevamente.',
@@ -177,7 +174,7 @@ async def save_login_data(chat_id: int, token: str, litefarm_user_id: str):
             return True
             
     except Exception as e:
-        logger.error(f"Error saving login data: {sanitize_error_message(str(e), config.DEBUG)}")
+        logger.error(f"Error saving login data: {sanitize_error_message(str(e))}")
         return False
 
 @app.route('/login/<int:chat_id>')
@@ -312,26 +309,26 @@ def login_post():
         else:
             try:
                 error_data = response.json()
-                error_message = sanitize_error_message(error_data.get('message', f'Error del servidor: {response.status_code}'), config.DEBUG)
+                error_message = sanitize_error_message(error_data.get('message', f'Error del servidor: {response.status_code}'))
             except json.JSONDecodeError:
-                error_message = sanitize_error_message(f'Error del servidor: {response.status_code}', config.DEBUG)
+                error_message = sanitize_error_message(f'Error del servidor: {response.status_code}')
             
             return jsonify({'success': False, 'error': error_message}), response.status_code
     
     except requests.exceptions.ConnectionError as e:
-        error_msg = sanitize_error_message(str(e), config.DEBUG)
+        error_msg = sanitize_error_message(str(e))
         return jsonify({'success': False, 'error': error_msg}), 503
     
     except requests.exceptions.Timeout:
         return jsonify({'success': False, 'error': 'Tiempo de espera agotado. Intenta nuevamente.'}), 504
     
     except requests.exceptions.RequestException as e:
-        error_msg = sanitize_error_message(str(e), config.DEBUG)
+        error_msg = sanitize_error_message(str(e))
         return jsonify({'success': False, 'error': error_msg}), 500
     
     except Exception as e:
         # Log the error for debugging
-        logger.error(f"Unexpected error in login_post: {sanitize_error_message(str(e), True)}")
+        logger.error(f"Unexpected error in login_post: {sanitize_error_message(str(e))}")
         return jsonify({'success': False, 'error': 'Error interno del servidor. Intenta nuevamente.'}), 500
 
 @app.route('/login/success')
@@ -435,7 +432,7 @@ def oauth2_callback(provider):
         }, headers={'Accept': 'application/json'})
         
         if token_response.status_code != 200:
-            error_msg = sanitize_error_message(f'Error al obtener el token de acceso: {token_response.text}', config.DEBUG)
+            error_msg = sanitize_error_message(f'Error al obtener el token de acceso: {token_response.text}')
             return render_template('error.html', error=error_msg), 401
         
         token_data = token_response.json()
@@ -481,8 +478,6 @@ def oauth2_callback(provider):
         )
         
         print(f"-----> LiteFarm API Response Status: {litefarm_response.status_code}")
-        if config.DEBUG:
-            print(f"-----> LiteFarm API Response Text: {litefarm_response.text}")
         logger.info(f"Chat ID from session available: {bool(session.get('telegram_chat_id'))}")
         
         # Handle successful LiteFarm response
@@ -496,8 +491,6 @@ def oauth2_callback(provider):
                     jwt_payload = decode_jwt_token(litefarm_token)
                     litefarm_user_id = jwt_payload.get('user_id')
                     
-                    if config.DEBUG:
-                        print(f"-----> JWT Payload: {jwt_payload}")
                     logger.info(f"LiteFarm User ID obtained successfully")
                     
                     # Get chat_id from session
@@ -558,9 +551,9 @@ def oauth2_callback(provider):
         else:
             try:
                 error_data = litefarm_response.json()
-                error_message = sanitize_error_message(error_data.get('message', f'Error de autenticación con LiteFarm: {litefarm_response.status_code}'), config.DEBUG)
+                error_message = sanitize_error_message(error_data.get('message', f'Error de autenticación con LiteFarm: {litefarm_response.status_code}'))
             except json.JSONDecodeError:
-                error_message = sanitize_error_message(f'Error de autenticación con LiteFarm: {litefarm_response.status_code}', config.DEBUG)
+                error_message = sanitize_error_message(f'Error de autenticación con LiteFarm: {litefarm_response.status_code}')
             return render_template('error.html', error=error_message), litefarm_response.status_code
         
         # Prepare result data for testing display (fallback)
@@ -603,22 +596,18 @@ def oauth2_callback(provider):
         return render_template('oauth_test_results.html', result=result_data)
         
     except requests.exceptions.ConnectionError as e:
-        error_msg = sanitize_error_message(str(e), config.DEBUG)
+        error_msg = sanitize_error_message(str(e))
         return render_template('error.html', error=error_msg), 503
     except requests.exceptions.Timeout:
         return render_template('error.html', error='Tiempo de espera agotado al conectar con el servidor de autenticación. Intenta nuevamente.'), 504
     except requests.RequestException as e:
-        error_msg = sanitize_error_message(str(e), config.DEBUG)
+        error_msg = sanitize_error_message(str(e))
         return render_template('error.html', error=error_msg), 500
     except Exception as e:
-        logger.error(f"Unexpected error in oauth2_callback: {sanitize_error_message(str(e), True)}")
+        logger.error(f"Unexpected error in oauth2_callback: {sanitize_error_message(str(e))}")
         return render_template('error.html', error='Error inesperado durante la autenticación'), 500
-
 
 if __name__ == '__main__':
     # Security: Don't run in debug mode in production
     debug_mode = config.DEBUG if hasattr(config, 'DEBUG') else False
     app.run(debug=debug_mode, host='0.0.0.0', port=5000)
-        
-        
-        
