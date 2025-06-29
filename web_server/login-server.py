@@ -6,7 +6,14 @@ import sys
 import os
 import json
 import asyncio
+import logging
+import re
 from datetime import datetime, timezone, timedelta
+from markupsafe import escape
+
+# Configure logging to avoid sensitive data exposure
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Add the project root directory to the Python path first
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -35,6 +42,63 @@ config.validate_flask_vars()
 app = Flask(__name__)
 # Set a secret key for session management
 app.secret_key = config.FLASK_SECRET_KEY or secrets.token_urlsafe(32)
+
+# Security configurations
+app.config.update(
+    SESSION_COOKIE_SECURE=False,  # Set to True in production with HTTPS
+    SESSION_COOKIE_HTTPONLY=True,  # Prevent XSS access to session cookies
+    SESSION_COOKIE_SAMESITE='Lax',  # CSRF protection
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=1),  # Session timeout
+)
+
+# Add security headers
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    # Uncomment for production with HTTPS:
+    # response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
+# Input validation functions
+def validate_email(email):
+    """Validate email format"""
+    if not email or len(email) > 254:
+        return False
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def validate_chat_id(chat_id):
+    """Validate chat_id is a positive integer"""
+    try:
+        chat_id_int = int(chat_id)
+        return 1 <= chat_id_int <= 9999999999  # Reasonable range for Telegram chat IDs
+    except (ValueError, TypeError):
+        return False
+
+def sanitize_error_message(error_msg, is_debug=False):
+    """Sanitize error messages to prevent information disclosure"""
+    # Always return generic error messages for security
+    generic_errors = {
+        'connection': 'Servicio temporalmente no disponible. Intenta más tarde.',
+        'timeout': 'Tiempo de espera agotado. Intenta nuevamente.',
+        'auth': 'Error de autenticación. Verifica tus credenciales.',
+        'server': 'Error del servidor. Intenta más tarde.',
+        'invalid': 'Datos inválidos. Verifica la información ingresada.'
+    }
+    
+    error_lower = str(error_msg).lower()
+    if 'connection' in error_lower or 'refused' in error_lower:
+        return generic_errors['connection']
+    elif 'timeout' in error_lower:
+        return generic_errors['timeout']
+    elif 'auth' in error_lower or 'credential' in error_lower:
+        return generic_errors['auth']
+    elif 'server' in error_lower or '50' in error_lower:
+        return generic_errors['server']
+    else:
+        return generic_errors['invalid']
 
 # Set the LiteFarm URL
 LITEFARM_URL = config.URL_LITEFARM
@@ -69,7 +133,7 @@ async def save_login_data(chat_id: int, token: str, litefarm_user_id: str):
     """
     Save login data to database: user, chat session, and token
     """
-    print(f"-----> Starting save_login_data with chat_id: {chat_id}, user_id: {litefarm_user_id}")
+    logger.info(f"Starting save_login_data for chat_id: {chat_id}")
     try:
         async with AsyncSessionLocal() as db_session:
             user_service = create_user_service()
@@ -79,7 +143,7 @@ async def save_login_data(chat_id: int, token: str, litefarm_user_id: str):
             # Create or get user
             user_dto = CreateUserDTO(litefarm_user_id=litefarm_user_id)
             user = await user_service.create_user(user_dto, db_session)
-            print(f"-----> User created/retrieved: {user.litefarm_user_id}")
+            logger.info(f"User created/retrieved successfully")
             
             # Create chat session (this will deactivate previous sessions)
             # TODO: Think about multiple users per chat
@@ -88,7 +152,7 @@ async def save_login_data(chat_id: int, token: str, litefarm_user_id: str):
                 telegram_chat_id=chat_id
             )
             chat_session = await chat_service.create_chat_session(chat_dto, db_session)
-            print(f"-----> Chat session created: {chat_session.id}")
+            logger.info(f"Chat session created successfully")
             
             # Calculate token expiration (assuming 24 hours)
             # TODO: change to specified hours in the future
@@ -101,25 +165,26 @@ async def save_login_data(chat_id: int, token: str, litefarm_user_id: str):
                 expires_at=expires_at
             )
             token_obj = await token_service.create_token(token_dto, db_session)
-            print(f"-----> Token created: {token_obj.id}")
+            logger.info(f"Token created successfully")
             
             # Commit the transaction
             await db_session.commit()
             
-            print(f"Successfully saved login data for chat_id: {chat_id}, user_id: {litefarm_user_id}")
+            logger.info(f"Successfully saved login data for chat_id: {chat_id}")
             return True
             
     except Exception as e:
-        print(f"Error saving login data: {e}")
+        logger.error(f"Error saving login data: {sanitize_error_message(str(e))}")
         return False
 
 @app.route('/login/<int:chat_id>')
 def login_with_chat_id(chat_id):
     """Handle login with chat_id in URL path"""
-    if chat_id is None:
-        return render_template('not_allowed.html')
+    if not validate_chat_id(chat_id):
+        return render_template('error.html', error='ID de chat inválido'), 400
     # Store chat_id in session for later use
     session['telegram_chat_id'] = chat_id
+    session.permanent = True
     return render_template('index.html', chat_id=chat_id)
 
 ## post request to /login
@@ -131,15 +196,28 @@ def index():
 def login_post():
     """Handle email/password login by forwarding to LiteFarm API"""
     try:
-        # Get form data
-        email = request.form.get('email')
-        password = request.form.get('password')
-        screen_width = request.form.get('screen_width', 1920)  # Default values
-        screen_height = request.form.get('screen_height', 1080)
+        # Get form data with input validation
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
         
         # Validate required fields
         if not email or not password:
-            return render_template('error.html', error='Email y contraseña son requeridos'), 400
+            return jsonify({'success': False, 'error': 'Email y contraseña son requeridos'}), 400
+            
+        # Validate email format
+        if not validate_email(email):
+            return jsonify({'success': False, 'error': 'Formato de email inválido'}), 400
+            
+        # Validate password length (basic validation)
+        if len(password) < 1 or len(password) > 128:
+            return jsonify({'success': False, 'error': 'Contraseña inválida'}), 400
+        
+        # Get screen dimensions with validation
+        try:
+            screen_width = max(320, min(int(request.form.get('screen_width', 1920)), 7680))
+            screen_height = max(240, min(int(request.form.get('screen_height', 1080)), 4320))
+        except (ValueError, TypeError):
+            screen_width, screen_height = 1920, 1080
         
         # Prepare request data in the format expected by LiteFarm API
         litefarm_data = {
@@ -148,8 +226,8 @@ def login_post():
                 'password': password
             },
             'screenSize': {
-                'screen_width': int(screen_width),
-                'screen_height': int(screen_height)
+                'screen_width': screen_width,
+                'screen_height': screen_height
             }
         }
         
@@ -157,12 +235,16 @@ def login_post():
         headers = {
             'Content-Type': 'application/json',
             'User-Agent': request.headers.get('User-Agent', 'Mozilla/5.0 (Unknown)'),
-            'Accept-Language': request.headers.get('Accept-Language', 'en-US,en;q=0.9')
+            'Accept-Language': request.headers.get('Accept-Language', 'es-ES,es;q=0.9')
         }
         
-        # Add forwarded IP if available
-        if request.headers.get('X-Forwarded-For'):
-            headers['X-Forwarded-For'] = request.headers.get('X-Forwarded-For')
+        # Add forwarded IP if available (but sanitize it)
+        forwarded_for = request.headers.get('X-Forwarded-For')
+        if forwarded_for:
+            # Take only the first IP and validate format
+            first_ip = forwarded_for.split(',')[0].strip()
+            if re.match(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$', first_ip):
+                headers['X-Forwarded-For'] = first_ip
         
         # Send request to LiteFarm API
         response = requests.post(
@@ -197,9 +279,9 @@ def login_post():
                                 save_login_data(chat_id, token, litefarm_user_id)
                             )
                             if success:
-                                print(f"Login data saved successfully for chat_id: {chat_id}")
+                                logger.info(f"Login data saved successfully")
                             else:
-                                print(f"Failed to save login data for chat_id: {chat_id}")
+                                logger.warning(f"Failed to save login data")
                         finally:
                             loop.close()
                     
@@ -211,7 +293,6 @@ def login_post():
                         'chat_id': chat_id,
                         'litefarm_user_id': litefarm_user_id
                     }
-                    print(f"Token: {token}")
                     # Return JSON response for AJAX request
                     return jsonify({'success': True, 'redirect': url_for('login_success')})
                 else:
@@ -228,24 +309,26 @@ def login_post():
         else:
             try:
                 error_data = response.json()
-                error_message = error_data.get('message', f'Error del servidor: {response.status_code}')
+                error_message = sanitize_error_message(error_data.get('message', f'Error del servidor: {response.status_code}'))
             except json.JSONDecodeError:
-                error_message = f'Error del servidor: {response.status_code}'
+                error_message = sanitize_error_message(f'Error del servidor: {response.status_code}')
             
             return jsonify({'success': False, 'error': error_message}), response.status_code
+    
+    except requests.exceptions.ConnectionError as e:
+        error_msg = sanitize_error_message(str(e))
+        return jsonify({'success': False, 'error': error_msg}), 503
     
     except requests.exceptions.Timeout:
         return jsonify({'success': False, 'error': 'Tiempo de espera agotado. Intenta nuevamente.'}), 504
     
-    except requests.exceptions.ConnectionError:
-        return jsonify({'success': False, 'error': 'No se pudo conectar al servidor. Intenta más tarde.'}), 503
-    
     except requests.exceptions.RequestException as e:
-        return jsonify({'success': False, 'error': f'Error de red: {str(e)}'}), 500
+        error_msg = sanitize_error_message(str(e))
+        return jsonify({'success': False, 'error': error_msg}), 500
     
     except Exception as e:
         # Log the error for debugging
-        print(f"Unexpected error in login_post: {str(e)}")
+        logger.error(f"Unexpected error in login_post: {sanitize_error_message(str(e))}")
         return jsonify({'success': False, 'error': 'Error interno del servidor. Intenta nuevamente.'}), 500
 
 @app.route('/login/success')
@@ -269,8 +352,11 @@ def login_get():
     """Handle GET requests to /login - redirect to index or render with chat_id"""
     chat_id = request.args.get('chat_id') or request.args.get('user_id')
     if chat_id:
+        if not validate_chat_id(chat_id):
+            return render_template('error.html', error='ID de chat inválido'), 400
         # Store chat_id in session for later use
         session['telegram_chat_id'] = int(chat_id)
+        session.permanent = True
         return render_template('index.html', chat_id=chat_id)
     return redirect(url_for('index'))
 
@@ -284,7 +370,7 @@ def oauth2_authorize(provider):
     session['oauth2_state'] = secrets.token_urlsafe(16)
 
     generated_redirect_uri = url_for('oauth2_callback', provider=provider, _external=True)
-    print(f"-----> GENERATED REDIRECT URI FOR GOOGLE: {generated_redirect_uri}") # DEBUG LINE
+    logger.info(f"Generated redirect URI for {provider}")
 
     # create a query string with all the OAuth2 parameters
     # Use 'scope' key instead of 'scopes' to match the config
@@ -303,20 +389,37 @@ def oauth2_authorize(provider):
 def oauth2_callback(provider):
     provider_data = current_app.config['OAUTH2_PROVIDERS'].get(provider)
     if not provider_data:
-        return render_template('error.html', error='Provider not found'), 404
+        return render_template('error.html', error='Proveedor de autenticación no encontrado'), 404
     
     if 'error' in request.args:
-        error_messages = []
-        for k, v in request.args.items():
-            if k.startswith('error'):
-                error_messages.append(f'{k}: {v}')
-        return render_template('error.html', error='; '.join(error_messages))
+        error_type = request.args.get('error', '')
+        error_description = request.args.get('error_description', '')
+        
+        # Translate common OAuth errors to Spanish
+        if error_type == 'access_denied':
+            error_message = 'Acceso denegado. Has cancelado la autorización.'
+        elif error_type == 'invalid_request':
+            error_message = 'Solicitud inválida. Por favor, intenta nuevamente.'
+        elif error_type == 'unauthorized_client':
+            error_message = 'Cliente no autorizado.'
+        elif error_type == 'unsupported_response_type':
+            error_message = 'Tipo de respuesta no soportado.'
+        elif error_type == 'invalid_scope':
+            error_message = 'Alcance inválido.'
+        elif error_type == 'server_error':
+            error_message = 'Error del servidor. Por favor, intenta más tarde.'
+        elif error_type == 'temporarily_unavailable':
+            error_message = 'Servicio temporalmente no disponible. Intenta más tarde.'
+        else:
+            error_message = f'Error de autenticación: {error_description or error_type}'
+        
+        return render_template('error.html', error=error_message)
 
     if request.args.get('state') != session.get('oauth2_state'):
-        return render_template('error.html', error='Invalid state parameter'), 401
+        return render_template('error.html', error='Parámetro de estado inválido. Por favor, intenta iniciar sesión nuevamente.'), 401
 
     if 'code' not in request.args:
-        return render_template('error.html', error='Authorization code not received'), 401
+        return render_template('error.html', error='Código de autorización no recibido. Por favor, intenta nuevamente.'), 401
 
     try:
         # Exchange authorization code for access token
@@ -329,14 +432,15 @@ def oauth2_callback(provider):
         }, headers={'Accept': 'application/json'})
         
         if token_response.status_code != 200:
-            return render_template('error.html', error=f'Failed to get access token: {token_response.text}'), 401
+            error_msg = sanitize_error_message(f'Error al obtener el token de acceso: {token_response.text}')
+            return render_template('error.html', error=error_msg), 401
         
         token_data = token_response.json()
         oauth2_token = token_data.get('access_token')
         id_token = token_data.get('id_token')  # This is the JWT token from Google
         
         if not oauth2_token:
-            return render_template('error.html', error='No access token received'), 401
+            return render_template('error.html', error='No se recibió el token de acceso'), 401
 
         # Get user information from Google
         userinfo_response = requests.get(
@@ -345,7 +449,7 @@ def oauth2_callback(provider):
         )
         
         if userinfo_response.status_code != 200:
-            return render_template('error.html', error='Failed to get user information'), 401
+            return render_template('error.html', error='Error al obtener la información del usuario'), 401
         
         user_info = userinfo_response.json()
         
@@ -374,8 +478,7 @@ def oauth2_callback(provider):
         )
         
         print(f"-----> LiteFarm API Response Status: {litefarm_response.status_code}")
-        print(f"-----> LiteFarm API Response Text: {litefarm_response.text}")
-        print(f"-----> Chat ID from session: {session.get('telegram_chat_id')}")
+        logger.info(f"Chat ID from session available: {bool(session.get('telegram_chat_id'))}")
         
         # Handle successful LiteFarm response
         if litefarm_response.status_code in [200, 201]:
@@ -388,13 +491,12 @@ def oauth2_callback(provider):
                     jwt_payload = decode_jwt_token(litefarm_token)
                     litefarm_user_id = jwt_payload.get('user_id')
                     
-                    print(f"-----> JWT Payload: {jwt_payload}")
-                    print(f"-----> LiteFarm User ID: {litefarm_user_id}")
+                    logger.info(f"LiteFarm User ID obtained successfully")
                     
                     # Get chat_id from session
                     chat_id = session.get('telegram_chat_id')
                     
-                    print(f"-----> About to save data - Chat ID: {chat_id}, User ID: {litefarm_user_id}")
+                    logger.info(f"About to save data - Chat ID available: {bool(chat_id)}, User ID available: {bool(litefarm_user_id)}")
                     
                     # Save login data to database if we have both chat_id and user_id
                     if chat_id and litefarm_user_id:
@@ -406,13 +508,13 @@ def oauth2_callback(provider):
                                 save_login_data(chat_id, litefarm_token, litefarm_user_id)
                             )
                             if success:
-                                print(f"Google login data saved successfully for chat_id: {chat_id}")
+                                logger.info(f"Google login data saved successfully")
                             else:
-                                print(f"Failed to save Google login data for chat_id: {chat_id}")
+                                logger.warning(f"Failed to save Google login data")
                         finally:
                             loop.close()
                     else:
-                        print(f"-----> Cannot save data - Missing chat_id: {chat_id} or user_id: {litefarm_user_id}")
+                        logger.warning("Cannot save data - Missing chat_id or user_id")
                     
                     # Store data in session for the success page
                     session['login_success'] = {
@@ -435,9 +537,26 @@ def oauth2_callback(provider):
                     return redirect(url_for('login_success'))
                     
             except (json.JSONDecodeError, ValueError):
-                pass  # Fall through to test results display
+                return render_template('error.html', error='Error al procesar la respuesta del servidor de autenticación'), 500
         
-        # Prepare result data for testing display
+        # Handle failed LiteFarm response
+        elif litefarm_response.status_code == 401:
+            return render_template('error.html', error='Credenciales inválidas para LiteFarm. Tu cuenta de Google no está asociada con una cuenta de LiteFarm válida.'), 401
+        elif litefarm_response.status_code == 403:
+            return render_template('error.html', error='Acceso denegado a LiteFarm. Verifica que tu cuenta tenga los permisos necesarios.'), 403
+        elif litefarm_response.status_code == 404:
+            return render_template('error.html', error='Tu cuenta de Google no está registrada en LiteFarm. Por favor, crea una cuenta primero.'), 404
+        elif litefarm_response.status_code >= 500:
+            return render_template('error.html', error='Error del servidor de LiteFarm. Por favor, intenta más tarde.'), 500
+        else:
+            try:
+                error_data = litefarm_response.json()
+                error_message = sanitize_error_message(error_data.get('message', f'Error de autenticación con LiteFarm: {litefarm_response.status_code}'))
+            except json.JSONDecodeError:
+                error_message = sanitize_error_message(f'Error de autenticación con LiteFarm: {litefarm_response.status_code}')
+            return render_template('error.html', error=error_message), litefarm_response.status_code
+        
+        # Prepare result data for testing display (fallback)
         result_data = {
             'google_user_info': {
                 'user_id': user_id,
@@ -476,14 +595,19 @@ def oauth2_callback(provider):
         # Return the testing results
         return render_template('oauth_test_results.html', result=result_data)
         
+    except requests.exceptions.ConnectionError as e:
+        error_msg = sanitize_error_message(str(e))
+        return render_template('error.html', error=error_msg), 503
+    except requests.exceptions.Timeout:
+        return render_template('error.html', error='Tiempo de espera agotado al conectar con el servidor de autenticación. Intenta nuevamente.'), 504
     except requests.RequestException as e:
-        return render_template('error.html', error=f'Network error: {str(e)}'), 500
+        error_msg = sanitize_error_message(str(e))
+        return render_template('error.html', error=error_msg), 500
     except Exception as e:
-        return render_template('error.html', error=f'Unexpected error: {str(e)}'), 500
-
+        logger.error(f"Unexpected error in oauth2_callback: {sanitize_error_message(str(e))}")
+        return render_template('error.html', error='Error inesperado durante la autenticación'), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
-        
-        
-        
+    # Security: Don't run in debug mode in production
+    debug_mode = config.DEBUG if hasattr(config, 'DEBUG') else False
+    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
