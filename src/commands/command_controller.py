@@ -21,15 +21,15 @@ def register_handlers(dp: Dispatcher):
     async def start_handler(message: Message):
         await cmd_start(message)
 
-    @dp.message(Command("help"))
+    @dp.message(Command("ayuda"))
     async def help_handler(message: Message):
         await cmd_help(message)
     
-    @dp.message(Command("login"))
+    @dp.message(Command("iniciar_sesion"))
     async def login_handler(message: Message):
         await cmd_login(message)
     
-    @dp.message(Command("cancel"))
+    @dp.message(Command("cancelar"))
     async def cancel_handler(message: Message):
         await cmd_cancel(message)
     
@@ -49,19 +49,19 @@ def register_handlers(dp: Dispatcher):
     async def crop_selection_callback_handler(callback: CallbackQuery):
         await handle_crop_selection_callback(callback)
 
-    @dp.message(Command("selectfarm"))
+    @dp.message(Command("seleccionar_granja"))
     async def select_farm_handler(message: Message):
         await select_farm_command(message)
 
-    @dp.message(Command("currentfarm"))
+    @dp.message(Command("granja_actual"))
     async def cmd_current_farm_handler(message: Message):
         await current_farm_command(message)
 
-    @dp.message(Command("clearfarm"))
+    @dp.message(Command("borrar_seleccion_granja"))
     async def clear_farm_command_handler(message: Message):
         await clear_farm_command(message)
 
-    @dp.message(Command("status"))
+    @dp.message(Command("estado"))
     async def status_handler(message: Message):
         await cmd_status(message)
 
@@ -131,8 +131,8 @@ async def cmd_status(message: Message):
         remaining_message += f"{i}. {display_name}\n"
     
     remaining_message += "\n💡 **Comandos disponibles:**\n"
-    remaining_message += "• /cancel - Cancelar la transacción\n"
+    remaining_message += "• /cancelar - Cancelar la transacción\n"
     remaining_message += "• /skip - Saltar campo opcional (solo cliente)\n"
-    remaining_message += "• /status - Ver este estado nuevamente"
+    remaining_message += "• /estado - Ver este estado nuevamente"
     
     await message.answer(remaining_message)

@@ -12,7 +12,7 @@ async def cmd_cancel(message: Message):
         await message.answer(
             "❌ Transacción cancelada exitosamente.\n\n"
             "Puedes enviar otro mensaje para registrar una nueva transacción. "
-            "Si necesitas ayuda, escribe /help para ver ejemplos de uso. 🚜"
+            "Si necesitas ayuda, escribe /ayuda para ver ejemplos de uso. 🚜"
         )
     else:
         await message.answer(

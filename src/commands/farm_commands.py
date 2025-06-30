@@ -94,7 +94,7 @@ async def select_farm_command(message: types.Message):
 
         token = await get_valid_token_for_chat(telegram_chat_id, db)
         if not token:
-            await message.answer("❌ No valid token found. Please log in again using /login.")
+            await message.answer("❌ No valid token found. Please log in again using /iniciar_sesion.")
             return
             
         farms = await farm_service.fetch_and_cache_farms(
@@ -105,13 +105,13 @@ async def select_farm_command(message: types.Message):
 
         if not farms:
             await message.answer(
-                "❌ **No tienes granjas disponibles**\n\n"
+                "❌ <b>No tienes granjas disponibles</b>\n\n"
                 "Para usar FarmBot necesitas crear una granja en LiteFarm primero.\n\n"
-                "📋 **Pasos a seguir:**\n"
+                "📋 <b>Pasos a seguir:</b>\n"
                 "1. Ve a LiteFarm y crea una nueva granja\n"
-                "2. Regresa aquí y usa /selectfarm nuevamente\n\n"
+                "2. Regresa aquí y usa /seleccionar_granja nuevamente\n\n"
                 "ℹ️ Sin una granja no podrás registrar transacciones.",
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             return
 
@@ -126,10 +126,10 @@ async def select_farm_command(message: types.Message):
                     session=db
                 )
                 await message.answer(
-                    f"✅ **Granja seleccionada automáticamente**\n\n"
-                    f"🏡 **{farms[0].name}**\n\n"
+                    f"✅ <b>Granja seleccionada automáticamente</b>\n\n"
+                    f"🏡 <b>{farms[0].name}</b>\n\n"
                     "Ya puedes empezar a registrar transacciones.",
-                    parse_mode='Markdown'
+                    parse_mode='HTML'
                 )
                 return
             except Exception as e:
@@ -145,10 +145,10 @@ async def select_farm_command(message: types.Message):
         keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons, row_width=1)
 
         await message.answer(
-            "🏡 **Selecciona una granja:**\n\n"
+            "🏡 <b>Selecciona una granja:</b>\n\n"
             "Elige la granja donde quieres registrar tus transacciones:",
             reply_markup=keyboard,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
 
 
@@ -166,7 +166,7 @@ async def clear_farm_command(message: Message):
             return
 
         await farm_service.clear_farm_selection(chat_id=telegram_chat_id, session=db)
-        await message.answer("✅ Farm selection has been cleared.")
+        await message.answer("✅ Selección de granja borrada, debes seleccionar una granja para poder registrar ingresos o gastos.")
 
 async def current_farm_command(message: Message) -> None:
     """
@@ -180,15 +180,15 @@ async def current_farm_command(message: Message) -> None:
 
             if current_farm:
                 await message.answer(
-                    f"🟢 **Granja actual:** {current_farm.name}\n\n"
+                    f"🟢 <b>Granja actual:</b> {current_farm.name}\n\n"
                     f"Todas las transacciones se registrarán en esta granja.\n"
-                    f"Usa /selectfarm para cambiar de granja.",
-                    parse_mode='Markdown'
+                    f"Usa /seleccionar_granja para cambiar de granja.",
+                    parse_mode='HTML'
                 )
             else:
                 await message.answer(
                     "❌ No tienes ninguna granja seleccionada.\n\n"
-                    "Usa /selectfarm para elegir una granja antes de registrar transacciones."
+                    "Usa /seleccionar_granja para elegir una granja antes de registrar transacciones."
                 )
 
     except Exception as e:

@@ -24,7 +24,7 @@ class FarmValidationMiddleware(BaseMiddleware):
         
         # Commands that DON'T require farm validation (exact command names)
         self.excluded_commands = {
-            '/start', '/help', '/login', '/selectfarm', '/currentfarm', '/clearfarm'
+            '/iniciar', '/ayuda', '/iniciar_sesion', '/seleccionar_granja', '/granja_actual', '/borrar_seleccion_granja'
         }
     
     async def get_valid_token_for_chat(self, telegram_chat_id: int, session: AsyncSession):
@@ -83,7 +83,7 @@ class FarmValidationMiddleware(BaseMiddleware):
             token = await self.get_valid_token_for_chat(telegram_chat_id, db)
             if not token:
                 await event.answer(
-                    "❌ No tienes un token válido. Usa /login para autenticarte."
+                    "❌ No tienes un token válido. Usa /iniciar_sesion para autenticarte."
                 )
                 return
                 
@@ -95,12 +95,12 @@ class FarmValidationMiddleware(BaseMiddleware):
             
             if not farms:
                 await event.answer(
-                    "❌ **No tienes granjas disponibles**\n\n"
+                    "❌ <b>No tienes granjas disponibles</b>\n\n"
                     "Para usar FarmBot necesitas:\n"
                     "1. Crear una granja en LiteFarm\n"
-                    "2. Regresar aquí y usar /selectfarm\n\n"
-                    "👆 **Acción requerida:** Crea una granja en LiteFarm para continuar.",
-                    parse_mode='Markdown'
+                    "2. Regresar aquí y usar /seleccionar_granja\n\n"
+                    "👆 <b>Acción requerida:</b> Crea una granja en LiteFarm para continuar.",
+                    parse_mode='HTML'
                 )
                 return
                 
@@ -121,14 +121,14 @@ class FarmValidationMiddleware(BaseMiddleware):
                         session=db
                     )
                     await event.answer(
-                        f"✅ Se seleccionó automáticamente tu granja: **{farms[0].name}**",
-                        parse_mode='Markdown'
+                        f"✅ Se seleccionó automáticamente tu granja: <b>{farms[0].name}</b>",
+                        parse_mode='HTML'
                     )
                 else:
                     await event.answer(
-                        "❌ **Selecciona una granja primero**\n\n"
+                        "❌ <b>Selecciona una granja primero</b>\n\n"
                         "Tienes múltiples granjas disponibles.\n"
-                        "Usa /selectfarm para elegir una granja antes de continuar."
+                        "Usa /seleccionar_granja para elegir una granja antes de continuar."
                     )
                     return
         
