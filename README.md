@@ -411,15 +411,16 @@ GET  /crop_variety/farm/{farm_id} # Obtener variedades de cultivos por granja
 
 ### Comandos Básicos
 - `/start` - Inicializar bot y mostrar bienvenida
-- `/help` - Mostrar ayuda y comandos disponibles
-- `/login` - Iniciar proceso de autenticación
-- `/cancel` - Cancelar operación actual
+- `/ayuda` - Mostrar ayuda y comandos disponibles
+- `/iniciar_sesion` - Iniciar proceso de autenticación
+- `/cancelar` - Cancelar operación actual
+- `/estado` - Ver progreso de transacción actual
 - `/skip` - Saltar paso actual en conversación
 
 ### Comandos de Granja
-- `/selectfarm` - Seleccionar granja activa
-- `/currentfarm` - Información de la granja actual
-- `/clearfarm` - Quitar selección de granja
+- `/seleccionar_granja` - Seleccionar granja activa
+- `/granja_actual` - Información de la granja actual
+- `/borrar_seleccion_granja` - Quitar selección de granja
 
 ### Comandos de Configuración
 - `/habilitar_validacion` - Habilitar validación de transacciones

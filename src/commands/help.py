@@ -19,6 +19,7 @@ async def cmd_help(message: Message):
         "/granja_actual - Ver granja actual\n"
         "/borrar_seleccion_granja - Quitar selección de granja\n"
         "/estado - Ver progreso de transacción actual\n"
+        "/skip - Saltar campo opcional (solo cliente)\n"
         "/cancelar - Cancelar transacción incompleta\n"
         "/deshabilitar_validacion - Deshabilitar confirmación de transacciones\n"
         "/habilitar_validacion - Habilitar confirmación de transacciones\n\n"
