@@ -118,13 +118,13 @@ async def handle_confirmation_callback(callback: CallbackQuery):
                     await callback.message.edit_text(
                         "❌ Transacción cancelada exitosamente.\n\n"
                         "Puedes enviar otro mensaje para registrar una nueva transacción. "
-                        "Si necesitas ayuda, escribe /help para ver ejemplos de uso. 🚜"
+                        "Si necesitas ayuda, escribe /ayuda para ver ejemplos de uso. 🚜"
                     )
                 except Exception:
                     await callback.message.answer(
                         "❌ Transacción cancelada exitosamente.\n\n"
                         "Puedes enviar otro mensaje para registrar una nueva transacción. "
-                        "Si necesitas ayuda, escribe /help para ver ejemplos de uso. 🚜"
+                        "Si necesitas ayuda, escribe /ayuda para ver ejemplos de uso. 🚜"
                     )
                 await callback.answer("❌ Transacción cancelada.")
             else:

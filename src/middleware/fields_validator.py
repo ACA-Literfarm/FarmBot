@@ -282,7 +282,7 @@ def validate_transaction_context(chat_session_id: int, farm_id: str, token: str)
         if "granja seleccionada" in missing_context:
             error_message += "\n💡 Usa el comando /granjas para seleccionar una granja"
         if "token de autenticación" in missing_context:
-            error_message += "\n💡 Usa el comando /login para autenticarte"
+            error_message += "\n💡 Usa el comando /iniciar_sesion para autenticarte"
         
         return False, error_message
     

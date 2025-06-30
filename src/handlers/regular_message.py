@@ -63,9 +63,9 @@ Simplemente dime qué gasto o ingreso quieres registrar. Por ejemplo:
 • "Pagué $100 por mano de obra"
 
 **Comandos útiles:**
-/selectfarm - Seleccionar granja
-/currentfarm - Ver granja actual
-/help - Ver todos los comandos
+/seleccionar_granja - Seleccionar granja
+/granja_actual - Ver granja actual
+/ayuda - Ver todos los comandos
 
 ¡Estoy listo para ayudarte! ¿Qué transacción quieres registrar hoy? 😊"""
 
@@ -129,7 +129,7 @@ async def handle_regular_message(message: Message):
     selected_farm = await fetch_selected_farm_if_exists(chat_id=chat_id)
     if not selected_farm:
         await message.answer(
-            "❌ Necesitas seleccionar una granja primero.\n\nPor favor use /selectfarm para elegir una granja con la que trabajar."
+            "❌ Necesitas seleccionar una granja primero.\n\nPor favor use /seleccionar_granja para elegir una granja con la que trabajar."
         )
         return
 
@@ -338,14 +338,14 @@ async def enhance_error_message(error_message: str, field_name: str, state: dict
     
     # Special handling for crop_variety - don't add examples since validation already shows available crops
     if field_name == "crop_variety":
-        enhanced_message += "\n\n🔄 **Puedes intentar de nuevo o usar /cancel para cancelar la transacción.**"
+        enhanced_message += "\n\n🔄 **Puedes intentar de nuevo o usar /cancelar para cancelar la transacción.**"
         return enhanced_message
     
     if field_name in field_examples:
         enhanced_message += field_examples[field_name]
     
     # Add general guidance
-    enhanced_message += "\n\n🔄 **Puedes intentar de nuevo o usar /cancel para cancelar la transacción.**"
+    enhanced_message += "\n\n🔄 **Puedes intentar de nuevo o usar /cancelar para cancelar la transacción.**"
     
     return enhanced_message
 
@@ -542,7 +542,7 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
 
         # Handle different classifications
         if clasificacion == "no_relacionado":
-            respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /help para ver los comandos disponibles y ejemplos de uso."
+            respuesta += "\n\nℹ️ Si necesitas ayuda, escribe /ayuda para ver los comandos disponibles y ejemplos de uso."
             await message.answer(respuesta)
             return
         
@@ -607,7 +607,7 @@ async def process_new_message(message: Message, user_input: str, selected_farm, 
         logging.warning("Respuesta del modelo no tiene formato JSON válido. Respuesta recibida: %s", response_text)
         await message.answer(
             "❌ Lo siento, no entendí tu mensaje o hubo un error procesando la respuesta. "
-            "Por favor, intenta reformular tu mensaje o usa /help para ver ejemplos de uso."
+            "Por favor, intenta reformular tu mensaje o usa /ayuda para ver ejemplos de uso."
         )
 
 
