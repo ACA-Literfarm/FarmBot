@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from typing import Optional
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(override=True)
 
 
 class Config:
@@ -27,6 +27,7 @@ class Config:
     FLASK_SECRET_KEY: Optional[str] = os.getenv("FLASK_SECRET_KEY")
     GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET: Optional[str] = os.getenv("GOOGLE_CLIENT_SECRET")
+    LINK_SERVER: Optional[str] = os.getenv("LINK_SERVER")
     
     @classmethod
     def validate_required_vars(cls) -> None:

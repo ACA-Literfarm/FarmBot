@@ -1,0 +1,66 @@
+{
+  "7710313620": [
+    {
+      "user_id": "771015ac-322e-11f0-94b4-66ab45519382",
+      "farm_id": "5aa78ca8-3236-11f0-a33e-66ab45519382",
+      "role_id": 1,
+      "has_consent": true,
+      "status": "Active",
+      "consent_version": "7.1",
+      "wage": {
+        "type": "hourly",
+        "amount": 0
+      },
+      "step_one": true,
+      "step_one_end": "2025-05-16T09:15:47.666Z",
+      "step_two": true,
+      "step_two_end": "2025-05-16T09:15:52.484Z",
+      "step_three": true,
+      "step_three_end": "2025-05-16T09:16:03.650Z",
+      "step_four": true,
+      "step_four_end": "2025-05-16T09:16:07.723Z",
+      "step_five": true,
+      "step_five_end": "2025-05-16T09:16:09.279Z",
+      "wage_do_not_ask_again": null,
+      "role": "Owner",
+      "first_name": "Fer",
+      "last_name": "Test",
+      "profile_picture": null,
+      "email": "00124221@uca.edu.sv",
+      "phone_number": null,
+      "user_address": null,
+      "notification_setting": {
+        "alert_pest": true,
+        "alert_weather": true,
+        "alert_worker_finish": true,
+        "alert_before_planned_date": true,
+        "alert_action_after_scouting": true
+      },
+      "language_preference": "es",
+      "status_id": 1,
+      "gender": "MALE",
+      "birth_year": 2002,
+      "do_not_email": false,
+      "sandbox_user": false,
+      "farm_name": "Napoles",
+      "address": "13.678056, -89.23644",
+      "units": {
+        "currency": "USD",
+        "measurement": "metric"
+      },
+      "grid_points": {
+        "lat": 13.678056,
+        "lng": -89.23644
+      },
+      "farm_phone_number": null,
+      "sandbox_farm": false,
+      "country_id": 63,
+      "owner_operated": true,
+      "default_initial_location_id": null,
+      "utc_offset": null,
+      "farm_image_url": null,
+      "farm_image_thumbnail_url": null,
+      "owner_name": "Fer Test"
+    }
+  ]
+}

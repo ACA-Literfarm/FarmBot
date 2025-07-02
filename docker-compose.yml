@@ -1,0 +1,19 @@
+volumes:
+  db_data:
+
+
+services:
+  db:
+    image: postgres:15
+    container_name: chatbot-db
+    ports:
+      - "5432:5432"
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - ./initdb.d:/docker-entrypoint-initdb.d
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped

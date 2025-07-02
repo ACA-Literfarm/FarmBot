@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiteFarm - Error</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="login-card">
+            <!-- Logo de LiteFarm con ícono de error -->
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="LiteFarm Logo" class="main-logo">
+                <div class="error-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+            </div>
+
+            <!-- Mensaje de error -->
+            <div class="status-message error-message">
+                <i class="fas fa-exclamation-circle"></i>
+                {% if error %}
+                    {{ error|e }}
+                {% else %}
+                    Ha ocurrido un error inesperado. Por favor, intenta nuevamente.
+                {% endif %}
+            </div>
+
+            <!-- Botón para volver -->
+            <div class="login-options">
+                <a href="/" style="text-decoration: none;">
+                    <button class="login-btn" style="background-color: #ffc107; border-color: #ffc107; color: #8B6E00;">
+                        <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>
+                        Volver al inicio
+                    </button>
+                </a>
+            </div>
+
+            <!-- Detalles del error (solo para desarrollo/debug) -->
+            {% if error and config.DEBUG %}
+            <div class="error-details" style="
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                padding: 15px;
+                margin-top: 20px;
+                width: 100%;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                color: #6c757d;
+                word-break: break-all;
+                text-align: left;
+            ">
+                <strong>Detalles técnicos:</strong><br>
+                {{ error|e }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <style>
+        .error-icon {
+            font-size: 30px;
+            color: #dc3545;
+        }
+        
+        .error-details {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+    </style>
+</body>
+</html>

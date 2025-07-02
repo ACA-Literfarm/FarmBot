@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiteFarm - Login Exitoso</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="login-card">
+            <!-- Logo de LiteFarm con ícono de éxito -->
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="LiteFarm Logo" class="main-logo">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+            </div>
+
+            <!-- Mensaje de éxito -->
+            <div class="status-message success-message">
+                <i class="fas fa-check-circle"></i>
+                ¡Inicio de sesión exitoso!
+            </div>
+
+            <!-- Información del usuario (si está disponible) -->
+            {% if user %}
+            <div class="user-info">
+                <h3>Bienvenido</h3>
+                {% if user.first_name and user.last_name %}
+                <p><strong>Nombre:</strong> {{ user.first_name }} {{ user.last_name }}</p>
+                {% endif %}
+                {% if user.email %}
+                <p><strong>Email:</strong> {{ user.email }}</p>
+                {% endif %}
+                {% if user.user_id %}
+                <p><strong>ID de usuario:</strong> {{ user.user_id }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Información de la sesión (si está disponible) -->
+            {% if chat_id or litefarm_user_id %}
+            <div class="session-info">
+                <h4>Información de la sesión:</h4>
+                {% if chat_id %}
+                <p><strong>Chat ID de Telegram:</strong> {{ chat_id }}</p>
+                {% endif %}
+                {% if litefarm_user_id %}
+                <p><strong>LiteFarm User ID:</strong> {{ litefarm_user_id }}</p>
+                {% endif %}
+                <p><i class="fas fa-check-circle" style="color: #28a745;"></i> Datos guardados exitosamente en la base
+                    de datos</p>
+            </div>
+            {% endif %}
+
+            <!-- Instrucciones para el usuario -->
+            <div class="instructions">
+                <p>Tu sesión ha sido iniciada exitosamente. Ahora puedes:</p>
+                <ul>
+                    <li><i class="fas fa-telegram"></i> Regresar a Telegram para continuar</li>
+                    <li><i class="fas fa-window-close"></i> Cerrar esta ventana</li>
+                </ul>
+            </div>
+
+            <!-- Botón para cerrar -->
+            <div class="action-buttons">
+                <button type="button" class="close-btn" onclick="window.close()">
+                    <i class="fas fa-times"></i> Cerrar ventana
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .success-icon {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: #28a745;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-left: 4px solid #28a745;
+        }
+
+        .user-info h3 {
+            margin-top: 0;
+            color: #28a745;
+        }
+
+        .user-info p {
+            margin: 0.5rem 0;
+            color: #495057;
+        }
+
+        .session-info {
+            background: #d1ecf1;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .session-info h4 {
+            margin-top: 0;
+            color: #17a2b8;
+            font-size: 1rem;
+        }
+
+        .session-info p {
+            margin: 0.5rem 0;
+            color: #495057;
+        }
+
+        .token-info {
+            background: #e9ecef;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border: 1px solid #dee2e6;
+        }
+
+        .token-info h4 {
+            margin-top: 0;
+            color: #495057;
+            font-size: 0.9rem;
+        }
+
+        .token-display {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .token-display code {
+            flex: 1;
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+            word-break: break-all;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .copy-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.5rem;
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: 0.8rem;
+        }
+
+        .copy-btn:hover {
+            background: #0056b3;
+        }
+
+        .instructions {
+            margin: 1.5rem 0;
+            text-align: left;
+        }
+
+        .instructions p {
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .instructions ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .instructions li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .instructions li i {
+            color: #28a745;
+            width: 20px;
+        }
+
+        .action-buttons {
+            margin-top: 2rem;
+        }
+
+        .close-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0 auto;
+        }
+
+        .close-btn:hover {
+            background: #545b62;
+        }
+    </style>
+
+    <script>
+        function copyToken() {
+            const token = document.getElementById('auth-token').textContent;
+            navigator.clipboard.writeText(token).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copiado';
+                btn.style.background = '#28a745';
+
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.background = '#007bff';
+                }, 2000);
+            }).catch(err => {
+                console.error('Error copying token:', err);
+                alert('No se pudo copiar el token. Por favor, selecciónalo manualmente.');
+            });
+        }
+
+        // Auto-close after 30 seconds if opened in a popup
+        if (window.opener) {
+            setTimeout(() => {
+                window.close();
+            }, 30000);
+        }
+    </script>
+</body>
+
+</html>

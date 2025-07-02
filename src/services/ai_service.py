@@ -96,7 +96,7 @@ async def query_ai_model(user_message: str, expense_type: List[Dict[str, Any]], 
         response = await client.chat.completions.create(
             model=config.MODEL_NAME,
             messages=messages,
-            max_tokens=150,
+            max_tokens=300,
             temperature=0.3,  # Very low temperature for consistent behavior
         )
 
