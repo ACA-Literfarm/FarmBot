@@ -26,12 +26,12 @@ Permite registrar gastos e ingresos en lenguaje natural, asociarlos a la granja 
 
 1. **Inicia una conversación** con el bot en Telegram.
 2. Escribe `/start` para recibir la bienvenida.
-3. Ejecuta `/login` y abre el enlace que aparece para autorizar tu cuenta de LiteFarm. 
+3. Ejecuta `/iniciar_sesion` y abre el enlace que aparece para autorizar tu cuenta de LiteFarm. 
 ```
 3.1 Debes dar click al link, o copiarlo y pegarlo en tu navegador web.
 3.2 La página web es en donde deberás de iniciar sesión ya sea con tu usuario y contraseña o con google. Debes de tener ya una cuenta de LiteFarm preexistente para poder iniciar sesión.
 ```
-4. Usa `/selectfarm` para elegir la granja sobre la que vas a trabajar.
+4. Usa `/seleccionar_granja` para elegir la granja sobre la que vas a trabajar.
 
 ¡Listo! Ahora puedes empezar a registrar transacciones escribiendo mensajes como:
 
@@ -47,25 +47,27 @@ Vendí tomates por 100 dólares a Juan Pérez
 | Comando | Alias / Argumentos | Descripción |
 |---------|-------------------|-------------|
 | `/start` | — | Inicia el bot y muestra un mensaje de bienvenida. |
-| `/help` | — | Muestra este manual rápido de ayuda dentro del chat. |
-| `/login` | — | Abre un enlace para iniciar sesión en LiteFarm y vincular tu cuenta. |
-| `/selectfarm` | — | Muestra el listado de granjas disponibles y permite seleccionar una. Si solo tienes una se selecciona automáticamente. |
-| `/currentfarm` | — | Indica la granja actualmente seleccionada. |
-| `/clearfarm` | — | Quita la selección de granja (deberás elegir otra antes de registrar transacciones). |
+| `/ayuda` | — | Muestra este manual rápido de ayuda dentro del chat. |
+| `/iniciar_sesion` | — | Abre un enlace para iniciar sesión en LiteFarm y vincular tu cuenta. |
+| `/cancelar` | — | Cancela la transacción en curso. |
 | `/deshabilitar_validacion` | — | Desactiva la confirmación previa al registro de transacciones. |
 | `/habilitar_validacion` | — | Activa la confirmación previa al registro de transacciones (opción por defecto). |
+| `/seleccionar_granja` | — | Muestra el listado de granjas disponibles y permite seleccionar una. Si solo tienes una se selecciona automáticamente. |
+| `/granja_actual` | — | Indica la granja actualmente seleccionada. |
+| `/borrar_seleccion_granja` | — | Quita la selección de granja (deberás elegir otra antes de registrar transacciones). |
+| `/estado` | — | Muestra el estado actual de la transacción en curso. |
 
 ---
 
 ## 4. Flujo de trabajo recomendado
 
-1. **Iniciar sesión** (`/login`) → autorización en LiteFarm.  
-2. **Seleccionar granja** (`/selectfarm`).  
+1. **Iniciar sesión** (`/iniciar_sesion`) → autorización en LiteFarm.  
+2. **Seleccionar granja** (`/seleccionar_granja`).  
 3. **Registrar transacción**: escribe el gasto/ingreso en lenguaje natural.  
 4. **Confirmar** – si la validación está habilitada, pulsa ✅ para registrar o ❌ para cancelar.  
 5. **Repetir** según sea necesario.
 
-Puedes cambiar la granja en cualquier momento con `/selectfarm` o verificarla con `/currentfarm`.
+Puedes cambiar la granja en cualquier momento con `/seleccionar_granja` o verificarla con `/granja_actual`.
 
 ---
 
@@ -90,17 +92,17 @@ De forma predeterminada FarmBot solicita confirmación antes de registrar cualqu
 * Usa `/deshabilitar_validacion` si confías en la clasificación automática y prefieres registrar al instante.
 * Usa `/habilitar_validacion` para volver a exigir confirmación.
 
-> El estado actual se muestra en `/help`.
+> El estado actual se muestra en `/ayuda`.
 
 ---
 
 ## 7. Gestión de granjas
 
 | Acción | Comando | Resultado |
-|--------|---------|-----------|
-| Seleccionar granja | `/selectfarm` | Muestra las granjas y permite elegir una. |
-| Ver granja actual | `/currentfarm` | Indica la granja sobre la que se registrarán las transacciones. |
-| Quitar selección | `/clearfarm` | Borra la selección; necesitarás elegir una de nuevo. |
+|--------|------------------------|-------------------------------------------------------------|
+| Seleccionar granja | `/seleccionar_granja` | Muestra las granjas y permite elegir una. |
+| Ver granja actual | `/granja_actual` | Indica la granja sobre la que se registrarán las transacciones. |
+| Quitar selección | `/borrar_seleccion_granja` | Borra la selección; necesitarás elegir una de nuevo. |
 
 Si solo tienes una granja, el bot la seleccionará automáticamente.
 
@@ -110,8 +112,8 @@ Si solo tienes una granja, el bot la seleccionará automáticamente.
 
 | Problema | Solución recomendada |
 |----------|----------------------|
-| **"❌ No tienes granjas disponibles"** | Crea una granja en LiteFarm y luego usa `/selectfarm`. |
-| Error de token o sesión | Ejecuta `/login` nuevamente para renovar la autorización. |
+| **"❌ No tienes granjas disponibles"** | Crea una granja en LiteFarm y luego usa `/seleccionar_granja`. |
+| Error de token o sesión | Ejecuta `/iniciar_sesion` nuevamente para renovar la autorización. |
 | El bot no responde | Comprueba tu conexión y vuelve a enviar el comando. |
 
 ---
