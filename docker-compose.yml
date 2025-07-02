@@ -1,6 +1,7 @@
 volumes:
   db_data:
 
+
 services:
   db:
     image: postgres:15
